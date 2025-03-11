@@ -1,23 +1,23 @@
 
-import { Equipment, Rack, RackSummary, VirtualMachine } from '../types/rack';
+import { Equipment, Rack, RackSummary, VirtualMachine, SwitchPort } from '../types/rack';
 import { getRackById, getRackSummaries, racks } from '../data/mockData';
 
 /**
- * In a real application, these functions would make API calls to a backend
- * For now, they'll just manipulate the in-memory data
+ * Dans une application réelle, ces fonctions feraient des appels API vers un backend
+ * Pour l'instant, elles vont simplement manipuler les données en mémoire
  */
 
-// Get all rack summaries
+// Récupérer tous les résumés de baies
 export const getAllRackSummaries = (): RackSummary[] => {
   return getRackSummaries();
 };
 
-// Get a specific rack by ID
+// Récupérer une baie spécifique par ID
 export const getRack = (id: string): Rack | undefined => {
   return getRackById(id);
 };
 
-// Add a new rack
+// Ajouter une nouvelle baie
 export const addRack = (rack: Omit<Rack, 'id' | 'equipment'>): Rack => {
   const newRack: Rack = {
     id: `rack-${Date.now()}`,
@@ -29,7 +29,7 @@ export const addRack = (rack: Omit<Rack, 'id' | 'equipment'>): Rack => {
   return newRack;
 };
 
-// Update a rack
+// Mettre à jour une baie
 export const updateRack = (id: string, updates: Partial<Rack>): Rack | undefined => {
   const rackIndex = racks.findIndex(r => r.id === id);
   if (rackIndex === -1) return undefined;
@@ -40,7 +40,7 @@ export const updateRack = (id: string, updates: Partial<Rack>): Rack | undefined
   return updatedRack;
 };
 
-// Delete a rack
+// Supprimer une baie
 export const deleteRack = (id: string): boolean => {
   const initialLength = racks.length;
   const newRacks = racks.filter(r => r.id !== id);
@@ -54,18 +54,18 @@ export const deleteRack = (id: string): boolean => {
   return true;
 };
 
-// Add equipment to a rack
+// Ajouter un équipement à une baie
 export const addEquipment = (rackId: string, equipment: Omit<Equipment, 'id'>): Equipment | undefined => {
   const rack = getRackById(rackId);
   if (!rack) return undefined;
 
-  // Check if the position is valid
+  // Vérifier si la position est valide
   const positionEnd = equipment.position + equipment.size - 1;
   if (equipment.position < 1 || positionEnd > rack.totalUnits) {
-    throw new Error(`Invalid position: Equipment exceeds rack boundaries (1-${rack.totalUnits})`);
+    throw new Error(`Position invalide: L'équipement dépasse les limites de la baie (1-${rack.totalUnits})`);
   }
 
-  // Check for overlapping equipment
+  // Vérifier si l'équipement chevauche un équipement existant
   const overlapping = rack.equipment.some(eq => {
     const eqStart = eq.position;
     const eqEnd = eq.position + eq.size - 1;
@@ -73,7 +73,18 @@ export const addEquipment = (rackId: string, equipment: Omit<Equipment, 'id'>): 
   });
 
   if (overlapping) {
-    throw new Error('Equipment overlaps with existing equipment');
+    throw new Error("L'équipement chevauche un équipement existant");
+  }
+
+  // Initialiser les ports si c'est un switch
+  if (equipment.type === 'switch' && equipment.portCount && !equipment.ports) {
+    equipment.ports = Array.from({ length: equipment.portCount }, (_, i) => ({
+      id: `port-${Date.now()}-${i}`,
+      portNumber: i + 1,
+      description: '',
+      connected: false,
+      taggedVlans: []
+    }));
   }
 
   const newEquipment: Equipment = {
@@ -85,7 +96,7 @@ export const addEquipment = (rackId: string, equipment: Omit<Equipment, 'id'>): 
   return newEquipment;
 };
 
-// Update equipment
+// Mettre à jour un équipement
 export const updateEquipment = (
   rackId: string,
   equipmentId: string,
@@ -97,19 +108,19 @@ export const updateEquipment = (
   const equipmentIndex = rack.equipment.findIndex(eq => eq.id === equipmentId);
   if (equipmentIndex === -1) return undefined;
 
-  // If position or size is changing, check for validity
+  // Si la position ou la taille change, vérifier la validité
   if (updates.position || updates.size) {
     const updatedEquipment = { ...rack.equipment[equipmentIndex], ...updates };
     const positionEnd = updatedEquipment.position + updatedEquipment.size - 1;
     
-    // Check rack boundaries
+    // Vérifier les limites de la baie
     if (updatedEquipment.position < 1 || positionEnd > rack.totalUnits) {
-      throw new Error(`Invalid position: Equipment exceeds rack boundaries (1-${rack.totalUnits})`);
+      throw new Error(`Position invalide: L'équipement dépasse les limites de la baie (1-${rack.totalUnits})`);
     }
 
-    // Check for overlapping with other equipment
+    // Vérifier le chevauchement avec d'autres équipements
     const overlapping = rack.equipment.some((eq, index) => {
-      if (index === equipmentIndex) return false; // Skip the equipment being updated
+      if (index === equipmentIndex) return false; // Ignorer l'équipement en cours de mise à jour
       
       const eqStart = eq.position;
       const eqEnd = eq.position + eq.size - 1;
@@ -117,18 +128,18 @@ export const updateEquipment = (
     });
 
     if (overlapping) {
-      throw new Error('Equipment overlaps with existing equipment');
+      throw new Error("L'équipement chevauche un équipement existant");
     }
   }
 
-  // Update the equipment
+  // Mettre à jour l'équipement
   const updatedEquipment = { ...rack.equipment[equipmentIndex], ...updates };
   rack.equipment[equipmentIndex] = updatedEquipment;
   
   return updatedEquipment;
 };
 
-// Remove equipment from rack
+// Supprimer un équipement de la baie
 export const removeEquipment = (rackId: string, equipmentId: string): boolean => {
   const rack = getRackById(rackId);
   if (!rack) return false;
@@ -139,7 +150,7 @@ export const removeEquipment = (rackId: string, equipmentId: string): boolean =>
   return rack.equipment.length !== initialLength;
 };
 
-// Add a virtual machine to a server
+// Ajouter une machine virtuelle à un serveur
 export const addVirtualMachine = (
   rackId: string,
   equipmentId: string,
@@ -164,7 +175,7 @@ export const addVirtualMachine = (
   return newVM;
 };
 
-// Update a virtual machine
+// Mettre à jour une machine virtuelle
 export const updateVirtualMachine = (
   rackId: string,
   equipmentId: string,
@@ -186,7 +197,7 @@ export const updateVirtualMachine = (
   return updatedVM;
 };
 
-// Remove a virtual machine
+// Supprimer une machine virtuelle
 export const removeVirtualMachine = (
   rackId: string,
   equipmentId: string,
@@ -202,4 +213,26 @@ export const removeVirtualMachine = (
   equipment.virtualMachines = equipment.virtualMachines.filter(vm => vm.id !== vmId);
   
   return equipment.virtualMachines.length !== initialLength;
+};
+
+// Mettre à jour un port de switch
+export const updateSwitchPort = (
+  rackId: string,
+  equipmentId: string,
+  portId: string,
+  updates: Partial<SwitchPort>
+): SwitchPort | undefined => {
+  const rack = getRackById(rackId);
+  if (!rack) return undefined;
+  
+  const equipment = rack.equipment.find(eq => eq.id === equipmentId);
+  if (!equipment || equipment.type !== 'switch' || !equipment.ports) return undefined;
+  
+  const portIndex = equipment.ports.findIndex(port => port.id === portId);
+  if (portIndex === -1) return undefined;
+  
+  const updatedPort = { ...equipment.ports[portIndex], ...updates };
+  equipment.ports[portIndex] = updatedPort;
+  
+  return updatedPort;
 };

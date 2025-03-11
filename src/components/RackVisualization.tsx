@@ -2,25 +2,28 @@
 import React, { useState } from 'react';
 import { Equipment, Rack } from '@/types/rack';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Server, Cpu } from 'lucide-react';
+import { Server, Cpu, Edit } from 'lucide-react';
 import EquipmentDetailPanel from './EquipmentDetailPanel';
+import EditEquipmentDialog from './EditEquipmentDialog';
+import { toast } from 'sonner';
 
 interface RackVisualizationProps {
   rack: Rack;
   onAddEquipment?: () => void;
-  onEditEquipment?: (equipment: Equipment) => void;
+  onEquipmentUpdated?: () => void;
 }
 
 const RackVisualization: React.FC<RackVisualizationProps> = ({ 
   rack, 
   onAddEquipment, 
-  onEditEquipment 
+  onEquipmentUpdated 
 }) => {
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   
-  // Build rack units visualization
+  // Construire la visualisation des unités de la baie
   const rackUnits = Array.from({ length: rack.totalUnits }, (_, i) => {
-    const unitNumber = rack.totalUnits - i; // Rack units start from bottom
+    const unitNumber = rack.totalUnits - i; // Les unités de la baie commencent par le bas
     const occupyingEquipment = rack.equipment.find(eq => {
       const equipmentStart = eq.position;
       const equipmentEnd = eq.position + eq.size - 1;
@@ -30,17 +33,35 @@ const RackVisualization: React.FC<RackVisualizationProps> = ({
     return { unitNumber, occupyingEquipment };
   });
   
-  // Helper to generate position string
+  // Fonction d'aide pour générer une chaîne de position
   const getPositionString = (equipment: Equipment) => {
     const start = equipment.position;
     const end = equipment.position + equipment.size - 1;
     return start === end ? `U${start}` : `U${start}-U${end}`;
   };
   
-  // Handle equipment selection
+  // Gérer la sélection d'équipement
   const handleEquipmentClick = (equipment: Equipment) => {
     setSelectedEquipment(equipment === selectedEquipment ? null : equipment);
-    if (onEditEquipment) onEditEquipment(equipment);
+  };
+  
+  // Gérer la mise à jour d'un équipement
+  const handleEquipmentUpdated = (equipment: Equipment) => {
+    setSelectedEquipment(equipment);
+    setEditDialogOpen(false);
+    if (onEquipmentUpdated) {
+      onEquipmentUpdated();
+    }
+    toast.success(`${equipment.name} mis à jour avec succès`);
+  };
+  
+  // Gérer la suppression d'un équipement
+  const handleEquipmentRemoved = () => {
+    setSelectedEquipment(null);
+    if (onEquipmentUpdated) {
+      onEquipmentUpdated();
+    }
+    toast.success("Équipement supprimé avec succès");
   };
   
   return (
@@ -59,21 +80,21 @@ const RackVisualization: React.FC<RackVisualizationProps> = ({
               <ScrollArea className="h-[600px] rounded border">
                 <div className="flex flex-col">
                   {rackUnits.map(({ unitNumber, occupyingEquipment }) => {
-                    // Non-occupied unit
+                    // Unité non occupée
                     if (!occupyingEquipment) {
                       return (
                         <div key={`unit-${unitNumber}`} className="rack-unit group">
                           <div className="rack-label">{unitNumber}</div>
                           <div className="h-full ml-10 flex items-center px-3">
                             <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                              Empty
+                              Vide
                             </span>
                           </div>
                         </div>
                       );
                     }
                     
-                    // Render first U of equipment
+                    // Afficher la première unité de l'équipement
                     if (occupyingEquipment.position === unitNumber) {
                       const equipmentClass = occupyingEquipment.type === 'switch' 
                         ? 'switch-equipment' 
@@ -118,7 +139,7 @@ const RackVisualization: React.FC<RackVisualizationProps> = ({
                       );
                     }
                     
-                    // Continuation units (not the first U of equipment)
+                    // Unités de continuation (pas la première unité de l'équipement)
                     return (
                       <div key={`unit-${unitNumber}`} className="rack-label-only h-12 relative">
                         <div className="rack-label">{unitNumber}</div>
@@ -134,27 +155,49 @@ const RackVisualization: React.FC<RackVisualizationProps> = ({
       
       <div className="lg:w-1/2 xl:w-3/5">
         {selectedEquipment ? (
-          <EquipmentDetailPanel equipment={selectedEquipment} />
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <button
+                onClick={() => setEditDialogOpen(true)}
+                className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+              >
+                <Edit className="h-4 w-4" />
+                Modifier cet équipement
+              </button>
+            </div>
+            <EquipmentDetailPanel equipment={selectedEquipment} />
+          </div>
         ) : (
           <div className="h-full flex items-center justify-center p-8 border rounded-lg bg-muted/30">
             <div className="text-center max-w-md">
               <Server className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-medium mb-2">No Equipment Selected</h3>
+              <h3 className="text-xl font-medium mb-2">Aucun Équipement Sélectionné</h3>
               <p className="text-muted-foreground mb-4">
-                Select a device from the rack to view its details or add a new equipment.
+                Sélectionnez un appareil dans la baie pour voir ses détails ou ajoutez un nouvel équipement.
               </p>
               {onAddEquipment && (
                 <button 
                   onClick={onAddEquipment}
                   className="text-primary hover:underline focus:outline-none"
                 >
-                  + Add New Equipment
+                  + Ajouter Nouvel Équipement
                 </button>
               )}
             </div>
           </div>
         )}
       </div>
+      
+      {selectedEquipment && (
+        <EditEquipmentDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          rack={rack}
+          equipment={selectedEquipment}
+          onEquipmentUpdated={handleEquipmentUpdated}
+          onEquipmentRemoved={handleEquipmentRemoved}
+        />
+      )}
     </div>
   );
 };

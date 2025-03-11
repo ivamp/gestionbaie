@@ -13,7 +13,7 @@ interface DashboardHeaderProps {
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ 
   title, 
   onAddNew, 
-  addNewLabel = "Add New" 
+  addNewLabel = "Ajouter" 
 }) => {
   const navigate = useNavigate();
   
@@ -22,7 +22,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       <div>
         <div className="inline-flex mb-2">
           <div className="bg-primary/10 text-primary text-xs font-medium px-2.5 py-1 rounded-full">
-            Datacenter Management
+            Gestion du Datacenter
           </div>
         </div>
         <h1 className="text-3xl font-bold tracking-tight">{title}</h1>

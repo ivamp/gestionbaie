@@ -39,18 +39,18 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
 }) => {
   const [equipmentType, setEquipmentType] = useState<EquipmentType>('server');
   
-  // Common fields
+  // Champs communs
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [position, setPosition] = useState('');
   const [size, setSize] = useState('1');
   
-  // Switch specific fields
+  // Champs spécifiques aux switchs
   const [portCount, setPortCount] = useState('');
   const [ipAddress, setIpAddress] = useState('');
   const [vlans, setVlans] = useState('');
   
-  // Server specific fields
+  // Champs spécifiques aux serveurs
   const [idracIp, setIdracIp] = useState('');
   const [description, setDescription] = useState('');
   
@@ -58,9 +58,9 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     e.preventDefault();
     
     try {
-      // Basic validation
+      // Validation de base
       if (!name || !brand || !position || !size) {
-        toast.error("Please fill in all required fields");
+        toast.error("Veuillez remplir tous les champs obligatoires");
         return;
       }
       
@@ -68,17 +68,17 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       const sizeNum = parseInt(size);
       
       if (isNaN(positionNum) || positionNum < 1 || positionNum > rack.totalUnits) {
-        toast.error(`Position must be a number between 1 and ${rack.totalUnits}`);
+        toast.error(`La position doit être un nombre entre 1 et ${rack.totalUnits}`);
         return;
       }
       
       if (isNaN(sizeNum) || sizeNum < 1 || sizeNum > rack.totalUnits) {
-        toast.error(`Size must be a number between 1 and ${rack.totalUnits}`);
+        toast.error(`La taille doit être un nombre entre 1 et ${rack.totalUnits}`);
         return;
       }
       
       if (positionNum + sizeNum - 1 > rack.totalUnits) {
-        toast.error("Equipment exceeds rack size");
+        toast.error("L'équipement dépasse la taille de la baie");
         return;
       }
       
@@ -92,7 +92,7 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       
       if (equipmentType === 'switch') {
         if (!portCount || !ipAddress) {
-          toast.error("Please fill in all switch-specific fields");
+          toast.error("Veuillez remplir tous les champs spécifiques au switch");
           return;
         }
         
@@ -108,13 +108,13 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       const addedEquipment = addEquipment(rack.id, newEquipment);
       
       if (addedEquipment) {
-        toast.success(`${equipmentType === 'switch' ? 'Switch' : 'Server'} added successfully`);
+        toast.success(`${equipmentType === 'switch' ? 'Switch' : 'Serveur'} ajouté avec succès`);
         onEquipmentAdded(addedEquipment);
         onOpenChange(false);
         resetForm();
       }
     } catch (error: any) {
-      toast.error(error.message || "Failed to add equipment");
+      toast.error(error.message || "Échec de l'ajout de l'équipement");
     }
   };
   
@@ -134,9 +134,9 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Equipment</DialogTitle>
+          <DialogTitle>Ajouter Nouvel Équipement</DialogTitle>
           <DialogDescription>
-            Add a new device to rack "{rack.name}"
+            Ajouter un nouvel appareil à la baie "{rack.name}"
           </DialogDescription>
         </DialogHeader>
         
@@ -149,7 +149,7 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="server" className="flex items-center gap-2">
                 <Server className="h-4 w-4" />
-                Server
+                Serveur
               </TabsTrigger>
               <TabsTrigger value="switch" className="flex items-center gap-2">
                 <Cpu className="h-4 w-4" />
@@ -157,7 +157,7 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
               </TabsTrigger>
             </TabsList>
             
-            {/* Common Fields */}
+            {/* Champs communs */}
             <div className="space-y-4 mb-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -170,10 +170,10 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="size">Size (U)</Label>
+                  <Label htmlFor="size">Taille (U)</Label>
                   <Select defaultValue="1" onValueChange={setSize}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select size" />
+                      <SelectValue placeholder="Sélectionner taille" />
                     </SelectTrigger>
                     <SelectContent>
                       {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((u) => (
@@ -187,20 +187,20 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">Nom</Label>
                 <Input
                   id="name"
-                  placeholder="Device name"
+                  placeholder="Nom de l'appareil"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="brand">Brand/Model</Label>
+                <Label htmlFor="brand">Marque/Modèle</Label>
                 <Input
                   id="brand"
-                  placeholder="e.g. Dell PowerEdge R740"
+                  placeholder="ex. Dell PowerEdge R740"
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
                 />
@@ -209,10 +209,10 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             
             <TabsContent value="server" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="idracIp">iDRAC IP Address</Label>
+                <Label htmlFor="idracIp">Adresse IP iDRAC</Label>
                 <Input
                   id="idracIp"
-                  placeholder="e.g. 192.168.1.100"
+                  placeholder="ex. 192.168.1.100"
                   value={idracIp}
                   onChange={(e) => setIdracIp(e.target.value)}
                 />
@@ -222,7 +222,7 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
                 <Label htmlFor="description">Description</Label>
                 <Input
                   id="description"
-                  placeholder="Server description"
+                  placeholder="Description du serveur"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
@@ -231,10 +231,10 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             
             <TabsContent value="switch" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="portCount">Number of Ports</Label>
+                <Label htmlFor="portCount">Nombre de Ports</Label>
                 <Select onValueChange={setPortCount}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select port count" />
+                    <SelectValue placeholder="Sélectionner nombre de ports" />
                   </SelectTrigger>
                   <SelectContent>
                     {[8, 12, 16, 24, 48, 96].map((count) => (
@@ -247,20 +247,20 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="ipAddress">IP Address</Label>
+                <Label htmlFor="ipAddress">Adresse IP</Label>
                 <Input
                   id="ipAddress"
-                  placeholder="e.g. 192.168.1.1"
+                  placeholder="ex. 192.168.1.1"
                   value={ipAddress}
                   onChange={(e) => setIpAddress(e.target.value)}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="vlans">VLANs (comma separated)</Label>
+                <Label htmlFor="vlans">VLANs (séparés par des virgules)</Label>
                 <Input
                   id="vlans"
-                  placeholder="e.g. VLAN 10, VLAN 20"
+                  placeholder="ex. VLAN 10, VLAN 20"
                   value={vlans}
                   onChange={(e) => setVlans(e.target.value)}
                 />
@@ -270,9 +270,9 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
           
           <DialogFooter className="mt-6">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              Annuler
             </Button>
-            <Button type="submit">Add Equipment</Button>
+            <Button type="submit">Ajouter Équipement</Button>
           </DialogFooter>
         </form>
       </DialogContent>

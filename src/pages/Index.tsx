@@ -27,9 +27,9 @@ const Index = () => {
   return (
     <div className="container max-w-7xl mx-auto px-4 py-8">
       <DashboardHeader 
-        title="Server Rack Management" 
+        title="Gestion des Baies Serveur" 
         onAddNew={() => setAddRackDialogOpen(true)} 
-        addNewLabel="Add Rack"
+        addNewLabel="Ajouter Baie"
       />
       
       {isLoading ? (
@@ -44,15 +44,15 @@ const Index = () => {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center h-64 text-center p-8 border rounded-lg glassmorphism animate-fade-in">
-          <h3 className="text-xl font-medium mb-2">No Racks Found</h3>
+          <h3 className="text-xl font-medium mb-2">Aucune Baie Trouvée</h3>
           <p className="text-muted-foreground mb-4 max-w-md">
-            Start by adding your first server rack to manage your data center equipment.
+            Commencez par ajouter votre première baie serveur pour gérer vos équipements du datacenter.
           </p>
           <button 
             onClick={() => setAddRackDialogOpen(true)}
             className="text-primary hover:underline focus:outline-none"
           >
-            + Add Your First Rack
+            + Ajouter Votre Première Baie
           </button>
         </div>
       )}

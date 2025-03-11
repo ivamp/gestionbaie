@@ -9,6 +9,14 @@ export interface VirtualMachine {
   ipAddress: string;
 }
 
+export interface SwitchPort {
+  id: string;
+  portNumber: number;
+  description: string;
+  connected: boolean;
+  taggedVlans: string[];
+}
+
 export interface Equipment {
   id: string;
   name: string;
@@ -20,6 +28,7 @@ export interface Equipment {
   portCount?: number;
   ipAddress?: string;
   vlans?: string[];
+  ports?: SwitchPort[];
   // Server-specific properties
   idracIp?: string;
   description?: string;
