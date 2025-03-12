@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
@@ -67,6 +66,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
   const [newVmDescription, setNewVmDescription] = useState('');
   const [newVmIp, setNewVmIp] = useState('');
   const [newVmAnydesk, setNewVmAnydesk] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Mise à jour des états lorsque l'équipement change
   useEffect(() => {
@@ -83,13 +83,17 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     setVirtualMachines(equipment.virtualMachines || []);
   }, [equipment]);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
     
     try {
       // Validation de base
       if (!name || !brand || !position || !size) {
         toast.error("Veuillez remplir tous les champs obligatoires");
+        setIsSubmitting(false);
         return;
       }
       
@@ -98,16 +102,19 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
       
       if (isNaN(positionNum) || positionNum < 1 || positionNum > rack.totalUnits) {
         toast.error(`La position doit être un nombre entre 1 et ${rack.totalUnits}`);
+        setIsSubmitting(false);
         return;
       }
       
       if (isNaN(sizeNum) || sizeNum < 1 || sizeNum > rack.totalUnits) {
         toast.error(`La taille doit être un nombre entre 1 et ${rack.totalUnits}`);
+        setIsSubmitting(false);
         return;
       }
       
       if (positionNum + sizeNum - 1 > rack.totalUnits) {
         toast.error("L'équipement dépasse la taille de la baie");
+        setIsSubmitting(false);
         return;
       }
       
@@ -123,7 +130,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
           updatedEquipment.portCount = parseInt(portCount);
         }
         updatedEquipment.ipAddress = ipAddress;
-        updatedEquipment.vlans = vlans.split(',').map(vlan => vlan.trim());
+        updatedEquipment.vlans = vlans.split(',').map(vlan => vlan.trim()).filter(vlan => vlan.length > 0);
         updatedEquipment.ports = ports;
       } else {
         updatedEquipment.idracIp = idracIp;
@@ -131,35 +138,44 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         updatedEquipment.virtualMachines = virtualMachines;
       }
       
-      const result = updateEquipment(rack.id, equipment.id, updatedEquipment);
+      const result = await updateEquipment(rack.id, equipment.id, updatedEquipment);
       
-      if (result) {
-        toast.success(`${equipment.type === 'switch' ? 'Switch' : 'Serveur'} mis à jour avec succès`);
-        onEquipmentUpdated(result);
-      }
+      toast.success(`${equipment.type === 'switch' ? 'Switch' : 'Serveur'} mis à jour avec succès`);
+      onEquipmentUpdated(result);
     } catch (error: any) {
       toast.error(error.message || "Échec de la mise à jour de l'équipement");
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
-  const handleDeleteEquipment = () => {
+  const handleDeleteEquipment = async () => {
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${equipment.name} ?`)) {
-      const success = removeEquipment(rack.id, equipment.id);
-      if (success) {
-        toast.success(`${equipment.type === 'switch' ? 'Switch' : 'Serveur'} supprimé avec succès`);
-        onOpenChange(false);
-        onEquipmentRemoved();
-      } else {
-        toast.error("Échec de la suppression de l'équipement");
+      setIsSubmitting(true);
+      try {
+        const success = await removeEquipment(rack.id, equipment.id);
+        if (success) {
+          toast.success(`${equipment.type === 'switch' ? 'Switch' : 'Serveur'} supprimé avec succès`);
+          onOpenChange(false);
+          onEquipmentRemoved();
+        } else {
+          toast.error("Échec de la suppression de l'équipement");
+        }
+      } catch (error: any) {
+        toast.error(error.message || "Échec de la suppression de l'équipement");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
   
-  const handleAddVm = () => {
+  const handleAddVm = async () => {
     if (!newVmName || !newVmIp || !newVmAnydesk) {
       toast.error("Veuillez remplir tous les champs de la VM");
       return;
     }
+    
+    setIsSubmitting(true);
     
     const newVm = {
       name: newVmName,
@@ -169,28 +185,35 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     };
     
     try {
-      const result = addVirtualMachine(rack.id, equipment.id, newVm);
-      if (result) {
-        setVirtualMachines([...virtualMachines, result]);
-        setNewVmName('');
-        setNewVmDescription('');
-        setNewVmIp('');
-        setNewVmAnydesk('');
-        toast.success("Machine virtuelle ajoutée avec succès");
-      }
+      const result = await addVirtualMachine(rack.id, equipment.id, newVm);
+      setVirtualMachines([...virtualMachines, result]);
+      setNewVmName('');
+      setNewVmDescription('');
+      setNewVmIp('');
+      setNewVmAnydesk('');
+      toast.success("Machine virtuelle ajoutée avec succès");
     } catch (error: any) {
       toast.error(error.message || "Échec de l'ajout de la VM");
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
-  const handleRemoveVm = (vmId: string) => {
+  const handleRemoveVm = async (vmId: string) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer cette VM ?")) {
-      const success = removeVirtualMachine(rack.id, equipment.id, vmId);
-      if (success) {
-        setVirtualMachines(virtualMachines.filter(vm => vm.id !== vmId));
-        toast.success("Machine virtuelle supprimée avec succès");
-      } else {
-        toast.error("Échec de la suppression de la VM");
+      setIsSubmitting(true);
+      try {
+        const success = await removeVirtualMachine(equipment.id, vmId);
+        if (success) {
+          setVirtualMachines(virtualMachines.filter(vm => vm.id !== vmId));
+          toast.success("Machine virtuelle supprimée avec succès");
+        } else {
+          toast.error("Échec de la suppression de la VM");
+        }
+      } catch (error: any) {
+        toast.error(error.message || "Échec de la suppression de la VM");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -432,7 +455,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                         />
                       </div>
                     </div>
-                    <Button onClick={handleAddVm} className="w-full mt-2">
+                    <Button onClick={handleAddVm} className="w-full mt-2" disabled={isSubmitting}>
                       <Plus className="mr-2 h-4 w-4" />
                       Ajouter VM
                     </Button>
@@ -594,7 +617,9 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Annuler
             </Button>
-            <Button type="submit" form="edit-form">Enregistrer</Button>
+            <Button type="submit" form="edit-form" disabled={isSubmitting}>
+              {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
+            </Button>
           </DialogFooter>
         </Tabs>
       </DialogContent>

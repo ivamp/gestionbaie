@@ -103,7 +103,7 @@ export const deleteRack = async (id: string): Promise<boolean> => {
 export const addEquipment = async (
   rackId: string, 
   equipment: Omit<Equipment, 'id'>
-): Promise<Equipment | undefined> => {
+): Promise<Equipment> => {
   try {
     const response = await fetch(`${API_URL}/equipment/${rackId}`, {
       method: 'POST',
@@ -114,8 +114,17 @@ export const addEquipment = async (
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `Erreur HTTP: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage;
+      try {
+        // Essayer de parser le message d'erreur en JSON
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || `Erreur HTTP: ${response.status}`;
+      } catch (e) {
+        // Si le parsing échoue, utiliser le texte brut
+        errorMessage = `Erreur HTTP: ${response.status} - ${errorText.substring(0, 100)}...`;
+      }
+      throw new Error(errorMessage);
     }
     
     return await response.json();
@@ -127,9 +136,10 @@ export const addEquipment = async (
 
 // Mettre à jour un équipement
 export const updateEquipment = async (
+  rackId: string,
   equipmentId: string,
   updates: Partial<Equipment>
-): Promise<Equipment | undefined> => {
+): Promise<Equipment> => {
   try {
     const response = await fetch(`${API_URL}/equipment/${equipmentId}`, {
       method: 'PUT',
@@ -140,8 +150,17 @@ export const updateEquipment = async (
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `Erreur HTTP: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage;
+      try {
+        // Essayer de parser le message d'erreur en JSON
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || `Erreur HTTP: ${response.status}`;
+      } catch (e) {
+        // Si le parsing échoue, utiliser le texte brut
+        errorMessage = `Erreur HTTP: ${response.status} - ${errorText.substring(0, 100)}...`;
+      }
+      throw new Error(errorMessage);
     }
     
     return await response.json();
@@ -167,9 +186,10 @@ export const removeEquipment = async (rackId: string, equipmentId: string): Prom
 
 // Ajouter une machine virtuelle à un serveur
 export const addVirtualMachine = async (
+  rackId: string,
   equipmentId: string,
   vm: Omit<VirtualMachine, 'id'>
-): Promise<VirtualMachine | undefined> => {
+): Promise<VirtualMachine> => {
   try {
     const response = await fetch(`${API_URL}/virtual-machines/${equipmentId}`, {
       method: 'POST',
@@ -180,7 +200,15 @@ export const addVirtualMachine = async (
     });
     
     if (!response.ok) {
-      throw new Error(`Erreur HTTP: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || `Erreur HTTP: ${response.status}`;
+      } catch (e) {
+        errorMessage = `Erreur HTTP: ${response.status} - ${errorText.substring(0, 100)}...`;
+      }
+      throw new Error(errorMessage);
     }
     
     return await response.json();
@@ -192,9 +220,10 @@ export const addVirtualMachine = async (
 
 // Mettre à jour une machine virtuelle
 export const updateVirtualMachine = async (
+  equipmentId: string,
   vmId: string,
   updates: Partial<VirtualMachine>
-): Promise<VirtualMachine | undefined> => {
+): Promise<VirtualMachine> => {
   try {
     const response = await fetch(`${API_URL}/virtual-machines/${vmId}`, {
       method: 'PUT',
@@ -205,7 +234,15 @@ export const updateVirtualMachine = async (
     });
     
     if (!response.ok) {
-      throw new Error(`Erreur HTTP: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || `Erreur HTTP: ${response.status}`;
+      } catch (e) {
+        errorMessage = `Erreur HTTP: ${response.status} - ${errorText.substring(0, 100)}...`;
+      }
+      throw new Error(errorMessage);
     }
     
     return await response.json();
@@ -234,9 +271,10 @@ export const removeVirtualMachine = async (
 
 // Mettre à jour un port de switch
 export const updateSwitchPort = async (
+  equipmentId: string,
   portId: string,
   updates: Partial<SwitchPort>
-): Promise<SwitchPort | undefined> => {
+): Promise<SwitchPort> => {
   try {
     const response = await fetch(`${API_URL}/switch-ports/${portId}`, {
       method: 'PUT',
@@ -247,7 +285,15 @@ export const updateSwitchPort = async (
     });
     
     if (!response.ok) {
-      throw new Error(`Erreur HTTP: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || `Erreur HTTP: ${response.status}`;
+      } catch (e) {
+        errorMessage = `Erreur HTTP: ${response.status} - ${errorText.substring(0, 100)}...`;
+      }
+      throw new Error(errorMessage);
     }
     
     return await response.json();
