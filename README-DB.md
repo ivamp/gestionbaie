@@ -1,32 +1,28 @@
 
 # Configuration de la Base de Données
 
-## Important: Architecture Client-Serveur
+## Architecture Client-Serveur
 
-Cette application est conçue comme une application frontend React. Pour se connecter à une base de données MariaDB, vous devez configurer une API backend séparée, car:
+Cette application est conçue comme une application frontend React avec un backend Node.js Express séparé qui se connecte à MariaDB.
 
-1. Les connexions directes à MySQL ne fonctionnent pas dans un navigateur
-2. Exposer les identifiants de base de données au client constitue un risque de sécurité
+## Configuration du Backend
 
-## Options pour l'intégration de la base de données
+1. Naviguez dans le dossier `backend`
+2. Créez un fichier `.env` à partir du modèle `.env.example`
+3. Installez les dépendances avec `npm install`
+4. Démarrez le serveur avec `npm start` ou `npm run dev` pour le mode développement
 
-### Option 1: Développement avec données simulées
-L'application utilise actuellement des données simulées pour le développement.
+## Configuration du Frontend
 
-### Option 2: Création d'une API backend (recommandé)
-Pour une application en production:
-
-1. Créez une API REST avec Node.js/Express, PHP, Python, etc.
-2. Configurez la connexion à la base de données dans cette API
-3. Modifiez les services dans `src/services/` pour faire des appels à votre API au lieu d'utiliser les données mockées
+1. Créez un fichier `.env` à la racine du projet à partir du modèle `.env.example`
+2. Définissez `VITE_API_URL` pour pointer vers votre API backend (par défaut: `http://localhost:3001/api`)
+3. Démarrez l'application frontend avec `npm run dev`
 
 ## Structure de la base de données
 
-Si vous créez une API backend, utilisez ce schéma pour votre base de données:
+Le backend configurera automatiquement la base de données lors du premier démarrage:
 
 ```sql
-USE baiesv2;
-
 -- Table des baies
 CREATE TABLE racks (
   id VARCHAR(36) PRIMARY KEY,
@@ -84,18 +80,44 @@ CREATE TABLE vlans (
 );
 ```
 
-## Configuration du fichier .env
+## Configuration des fichiers .env
 
-Si vous configurez une API backend, voici un exemple de configuration:
+### Backend (.env dans le dossier backend)
 
 ```
-# Backend API (ne pas préfixer avec VITE_)
+# Configuration de la base de données MariaDB
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=votre_utilisateur
 DB_PASSWORD=votre_mot_de_passe
 DB_NAME=baiesv2
 
-# Frontend (préfixer avec VITE_ pour Vite)
-VITE_API_URL=http://localhost:3000/api
+# Configuration du serveur
+PORT=3001
 ```
+
+### Frontend (.env à la racine du projet)
+
+```
+# URL de l'API backend
+VITE_API_URL=http://localhost:3001/api
+```
+
+## Déploiement
+
+Pour un déploiement en production:
+
+1. Configurez correctement les variables d'environnement pour les deux parties
+2. Utilisez un gestionnaire de processus comme PM2 pour le backend
+3. Créez une version de production du frontend avec `npm run build`
+4. Hébergez les fichiers statiques générés sur un serveur web
+
+## Dépannage
+
+Si vous rencontrez des problèmes de connexion:
+
+1. Vérifiez que le serveur backend est en cours d'exécution
+2. Vérifiez les informations de connexion à la base de données
+3. Vérifiez que l'URL de l'API est correctement configurée dans le frontend
+4. Consultez les logs du serveur backend pour plus d'informations
+

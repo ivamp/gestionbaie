@@ -2,35 +2,14 @@
 import { toast } from "@/components/ui/use-toast";
 
 export const checkEnvironmentVariables = () => {
-  // Dans un environnement frontend, on vérifie simplement si les variables sont exposées
-  // via import.meta.env (Vite) ou process.env (selon la configuration)
-  const requiredVariables = [
-    'VITE_DB_HOST',
-    'VITE_DB_PORT',
-    'VITE_DB_USER',
-    'VITE_DB_PASSWORD',
-    'VITE_DB_NAME'
-  ];
+  // Dans un environnement frontend, on vérifie simplement si l'URL de l'API est définie
+  const apiUrl = import.meta.env.VITE_API_URL;
   
-  // Vérifier si nous sommes côté client
-  if (typeof window !== 'undefined') {
-    // On est dans le navigateur, on ne peut pas accéder directement aux variables d'environnement
-    // Nous n'affichons qu'un message informatif
-    console.log("Les connexions à la base de données doivent être gérées par une API backend");
-    return false;
-  }
-  
-  // Cette partie ne s'exécutera que si nous sommes dans un environnement Node.js
-  const missingVariables = requiredVariables.filter(variable => {
-    const envValue = import.meta.env[variable];
-    return !envValue;
-  });
-  
-  if (missingVariables.length > 0) {
-    console.error(`Variables d'environnement manquantes: ${missingVariables.join(', ')}`);
+  if (!apiUrl) {
+    console.error('Variable d\'environnement manquante: VITE_API_URL');
     toast({
       title: "Configuration incomplète",
-      description: `Veuillez configurer les variables d'environnement: ${missingVariables.join(', ')}`,
+      description: "Veuillez configurer la variable d'environnement VITE_API_URL",
       variant: "destructive",
     });
     return false;
@@ -39,21 +18,36 @@ export const checkEnvironmentVariables = () => {
   return true;
 };
 
-// Fonction pour initialiser la connexion à la base de données
+// Fonction pour initialiser la connexion à l'API
 export const initDatabase = async () => {
-  // Dans un environnement frontend, nous ne pouvons pas nous connecter directement à MySQL
-  // Cette fonction va maintenant se contenter de simuler une connexion
-  console.log("Initialisation de la connexion à la base de données...");
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
   
-  // Simuler un délai pour l'initialisation
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Message informatif pour le développement
-  console.log("Mode de développement: utilisation des données simulées");
-  toast({
-    title: "Mode développement",
-    description: "Application fonctionnant avec des données simulées. Pour une connexion réelle à la base de données, une API backend est nécessaire.",
-  });
-  
-  return true;
+  try {
+    // Tester la connexion à l'API
+    const response = await fetch(`${apiUrl}/test`);
+    
+    if (!response.ok) {
+      throw new Error(`Erreur de connexion à l'API: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("Connexion à l'API réussie:", data.message);
+    
+    toast({
+      title: "Connexion réussie",
+      description: "Application connectée à la base de données via l'API backend.",
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Erreur lors de l'initialisation de la connexion:", error);
+    
+    toast({
+      title: "Erreur de connexion",
+      description: "Impossible de se connecter à l'API backend. Vérifiez que le serveur est en cours d'exécution.",
+      variant: "destructive",
+    });
+    
+    return false;
+  }
 };
