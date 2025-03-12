@@ -1,33 +1,28 @@
 
 # Configuration de la Base de Données
 
-## Prérequis
+## Important: Architecture Client-Serveur
 
-- MariaDB 10.5 ou plus récent
-- Node.js 14.x ou plus récent
+Cette application est conçue comme une application frontend React. Pour se connecter à une base de données MariaDB, vous devez configurer une API backend séparée, car:
 
-## Configuration
+1. Les connexions directes à MySQL ne fonctionnent pas dans un navigateur
+2. Exposer les identifiants de base de données au client constitue un risque de sécurité
 
-1. Créez une copie du fichier `.env.example` et nommez-le `.env`:
-   ```bash
-   cp .env.example .env
-   ```
+## Options pour l'intégration de la base de données
 
-2. Modifiez le fichier `.env` avec vos informations de connexion à la base de données:
-   ```
-   DB_HOST=localhost
-   DB_PORT=3306
-   DB_USER=votre_utilisateur
-   DB_PASSWORD=votre_mot_de_passe
-   DB_NAME=baiesv2
-   ```
+### Option 1: Développement avec données simulées
+L'application utilise actuellement des données simulées pour le développement.
 
-3. Créez la base de données:
-   ```sql
-   CREATE DATABASE baiesv2;
-   ```
+### Option 2: Création d'une API backend (recommandé)
+Pour une application en production:
 
-4. Créez les tables nécessaires en exécutant le script SQL suivant:
+1. Créez une API REST avec Node.js/Express, PHP, Python, etc.
+2. Configurez la connexion à la base de données dans cette API
+3. Modifiez les services dans `src/services/` pour faire des appels à votre API au lieu d'utiliser les données mockées
+
+## Structure de la base de données
+
+Si vous créez une API backend, utilisez ce schéma pour votre base de données:
 
 ```sql
 USE baiesv2;
@@ -89,11 +84,18 @@ CREATE TABLE vlans (
 );
 ```
 
-5. Démarrez l'application:
-   ```bash
-   npm run dev
-   ```
+## Configuration du fichier .env
 
-## Notes
-- Assurez-vous que l'utilisateur de base de données que vous spécifiez a les droits suffisants pour créer, lire, mettre à jour et supprimer des données dans la base de données spécifiée.
-- Le fichier `.env` est inclus dans `.gitignore` et ne sera pas versionné pour des raisons de sécurité.
+Si vous configurez une API backend, voici un exemple de configuration:
+
+```
+# Backend API (ne pas préfixer avec VITE_)
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=votre_utilisateur
+DB_PASSWORD=votre_mot_de_passe
+DB_NAME=baiesv2
+
+# Frontend (préfixer avec VITE_ pour Vite)
+VITE_API_URL=http://localhost:3000/api
+```
