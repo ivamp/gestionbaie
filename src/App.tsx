@@ -7,12 +7,19 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import RackDetails from "./pages/RackDetails";
 import NotFound from "./pages/NotFound";
+import { useEffect } from "react";
+import { initDatabase } from "./utils/databaseInit";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   // Définir le titre de la page
   document.title = "Gestion des Baies Serveur";
+  
+  // Initialiser la connexion à la base de données au démarrage
+  useEffect(() => {
+    initDatabase();
+  }, []);
   
   return (
     <QueryClientProvider client={queryClient}>

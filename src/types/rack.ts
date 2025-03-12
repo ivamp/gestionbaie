@@ -15,6 +15,7 @@ export interface SwitchPort {
   description: string;
   connected: boolean;
   taggedVlans: string[];
+  isFibre?: boolean; // Nouveau champ pour indiquer si le port est en fibre optique
 }
 
 export interface Equipment {
