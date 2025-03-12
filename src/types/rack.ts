@@ -52,3 +52,16 @@ export interface RackSummary {
   usedUnits: number;
   equipmentCount: number;
 }
+
+// Fonction utilitaire pour parser un string de VLANs en tableau
+export const parseVlans = (vlansString: string): string[] => {
+  return vlansString
+    .split(',')
+    .map(vlan => vlan.trim())
+    .filter(vlan => vlan.length > 0);
+};
+
+// Fonction utilitaire pour formater un tableau de VLANs en string
+export const formatVlans = (vlans: string[] | undefined): string => {
+  return vlans ? vlans.join(', ') : '';
+};

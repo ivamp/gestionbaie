@@ -130,8 +130,31 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
           updatedEquipment.portCount = parseInt(portCount);
         }
         updatedEquipment.ipAddress = ipAddress;
-        updatedEquipment.vlans = vlans.split(',').map(vlan => vlan.trim()).filter(vlan => vlan.length > 0);
-        updatedEquipment.ports = ports;
+        
+        // Assurons-nous que les VLANs sont correctement formatés et filtrés
+        const processedVlans = vlans
+          .split(',')
+          .map(vlan => vlan.trim())
+          .filter(vlan => vlan.length > 0);
+        
+        updatedEquipment.vlans = processedVlans;
+        
+        // S'assurer que les ports ont les bons VLANs disponibles pour le tagging
+        const updatedPorts = ports.map(port => {
+          // Filtrer les VLANs tagués qui n'existent plus dans la liste des VLANs
+          const validTaggedVlans = port.taggedVlans.filter(tag => 
+            processedVlans.includes(tag)
+          );
+          
+          return {
+            ...port,
+            taggedVlans: validTaggedVlans
+          };
+        });
+        
+        updatedEquipment.ports = updatedPorts;
+        console.log("VLANs mis à jour:", processedVlans);
+        console.log("Ports mis à jour:", updatedPorts);
       } else {
         updatedEquipment.idracIp = idracIp;
         updatedEquipment.description = description;
@@ -226,7 +249,8 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         portNumber: i + 1,
         description: '',
         connected: false,
-        taggedVlans: []
+        taggedVlans: [],
+        isFibre: false
       }));
       setPorts(initialPorts);
     } else if (equipment.portCount && ports.length < equipment.portCount) {
@@ -236,7 +260,8 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         portNumber: ports.length + 1,
         description: '',
         connected: false,
-        taggedVlans: []
+        taggedVlans: [],
+        isFibre: false
       };
       setPorts([...ports, newPort]);
     } else {
@@ -551,21 +576,22 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                             </Select>
                           </div>
                           <div className="col-span-7 flex flex-wrap gap-1">
-                            {equipment.vlans?.map((vlan) => (
-                              <button
-                                key={`${port.id}-${vlan}`}
-                                type="button"
-                                className={`px-2 py-1 text-xs rounded ${
-                                  port.taggedVlans.includes(vlan)
-                                    ? 'bg-primary text-white'
-                                    : 'bg-muted'
-                                }`}
-                                onClick={() => handleToggleVlanOnPort(port.id, vlan)}
-                              >
-                                {vlan}
-                              </button>
-                            ))}
-                            {!equipment.vlans?.length && (
+                            {equipment.vlans && equipment.vlans.length > 0 ? (
+                              equipment.vlans.map((vlan) => (
+                                <button
+                                  key={`${port.id}-${vlan}`}
+                                  type="button"
+                                  className={`px-2 py-1 text-xs rounded ${
+                                    port.taggedVlans.includes(vlan)
+                                      ? 'bg-primary text-white'
+                                      : 'bg-muted'
+                                  }`}
+                                  onClick={() => handleToggleVlanOnPort(port.id, vlan)}
+                                >
+                                  {vlan}
+                                </button>
+                              ))
+                            ) : (
                               <span className="text-xs text-muted-foreground">
                                 Ajoutez des VLANs dans l'onglet "Général"
                               </span>

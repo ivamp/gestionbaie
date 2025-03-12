@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Dialog, 
@@ -36,32 +35,43 @@ const AddRackDialog: React.FC<AddRackDialogProps> = ({
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
   const [totalUnits, setTotalUnits] = useState('42');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Basic validation
+    if (isSubmitting) return;
+    
+    // Validation
     if (!name || !location || !totalUnits) {
-      toast.error("Please fill in all required fields");
+      toast.error("Veuillez remplir tous les champs");
       return;
     }
     
-    const unitsNum = parseInt(totalUnits);
-    if (isNaN(unitsNum) || unitsNum < 1 || unitsNum > 60) {
-      toast.error("Total units must be a number between 1 and 60");
-      return;
+    setIsSubmitting(true);
+    
+    try {
+      const newRack = await addRack({
+        name,
+        location,
+        totalUnits: parseInt(totalUnits),
+      });
+      
+      toast.success("Baie ajoutée avec succès");
+      onOpenChange(false);
+      
+      // Réinitialiser le formulaire
+      setName('');
+      setLocation('');
+      setTotalUnits('42');
+      
+      // Notifier le parent
+      onRackAdded(newRack);
+    } catch (error: any) {
+      toast.error(error.message || "Échec de l'ajout de la baie");
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    const newRack = addRack({
-      name,
-      location,
-      totalUnits: unitsNum,
-    });
-    
-    toast.success(`Rack "${name}" added successfully`);
-    onRackAdded(newRack);
-    onOpenChange(false);
-    resetForm();
   };
   
   const resetForm = () => {

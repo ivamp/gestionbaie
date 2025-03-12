@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Dialog, 
@@ -39,82 +38,95 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
 }) => {
   const [equipmentType, setEquipmentType] = useState<EquipmentType>('server');
   
-  // Champs communs
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [position, setPosition] = useState('');
   const [size, setSize] = useState('1');
+  const [type, setType] = useState<EquipmentType>('server');
   
-  // Champs spécifiques aux switchs
   const [portCount, setPortCount] = useState('');
   const [ipAddress, setIpAddress] = useState('');
   const [vlans, setVlans] = useState('');
   
-  // Champs spécifiques aux serveurs
   const [idracIp, setIdracIp] = useState('');
   const [description, setDescription] = useState('');
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isSubmitting) return;
+    
+    if (!name || !brand || !position || !size || !type) {
+      toast.error("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+    
+    const positionNum = parseInt(position);
+    const sizeNum = parseInt(size);
+    
+    if (isNaN(positionNum) || positionNum < 1 || positionNum > rack.totalUnits) {
+      toast.error(`La position doit être un nombre entre 1 et ${rack.totalUnits}`);
+      return;
+    }
+    
+    if (isNaN(sizeNum) || sizeNum < 1 || sizeNum > rack.totalUnits) {
+      toast.error(`La taille doit être un nombre entre 1 et ${rack.totalUnits}`);
+      return;
+    }
+    
+    if (positionNum + sizeNum - 1 > rack.totalUnits) {
+      toast.error("L'équipement dépasse la taille de la baie");
+      return;
+    }
+    
+    for (const eq of rack.equipment) {
+      const eqStart = eq.position;
+      const eqEnd = eq.position + eq.size - 1;
+      const newStart = positionNum;
+      const newEnd = positionNum + sizeNum - 1;
+      
+      if ((newStart >= eqStart && newStart <= eqEnd) || 
+          (newEnd >= eqStart && newEnd <= eqEnd) ||
+          (newStart <= eqStart && newEnd >= eqEnd)) {
+        toast.error(`Chevauchement avec l'équipement existant: ${eq.name} (U${eq.position}-U${eq.position + eq.size - 1})`);
+        return;
+      }
+    }
+    
+    setIsSubmitting(true);
+    
     try {
-      // Validation de base
-      if (!name || !brand || !position || !size) {
-        toast.error("Veuillez remplir tous les champs obligatoires");
-        return;
-      }
-      
-      const positionNum = parseInt(position);
-      const sizeNum = parseInt(size);
-      
-      if (isNaN(positionNum) || positionNum < 1 || positionNum > rack.totalUnits) {
-        toast.error(`La position doit être un nombre entre 1 et ${rack.totalUnits}`);
-        return;
-      }
-      
-      if (isNaN(sizeNum) || sizeNum < 1 || sizeNum > rack.totalUnits) {
-        toast.error(`La taille doit être un nombre entre 1 et ${rack.totalUnits}`);
-        return;
-      }
-      
-      if (positionNum + sizeNum - 1 > rack.totalUnits) {
-        toast.error("L'équipement dépasse la taille de la baie");
-        return;
-      }
-      
-      const newEquipment: Omit<Equipment, 'id'> = {
+      const equipment: Omit<Equipment, 'id'> = {
         name,
+        type: type as EquipmentType,
         brand,
-        type: equipmentType,
         position: positionNum,
         size: sizeNum,
       };
       
-      if (equipmentType === 'switch') {
-        if (!portCount || !ipAddress) {
-          toast.error("Veuillez remplir tous les champs spécifiques au switch");
-          return;
-        }
-        
-        newEquipment.portCount = parseInt(portCount);
-        newEquipment.ipAddress = ipAddress;
-        newEquipment.vlans = vlans.split(',').map(vlan => vlan.trim());
+      if (type === 'switch') {
+        equipment.portCount = portCount ? parseInt(portCount) : undefined;
+        equipment.ipAddress = ipAddress;
+        equipment.vlans = vlans.split(',').map(vlan => vlan.trim()).filter(vlan => vlan);
       } else {
-        newEquipment.idracIp = idracIp;
-        newEquipment.description = description;
-        newEquipment.virtualMachines = [];
+        equipment.idracIp = idracIp;
+        equipment.description = description;
       }
       
-      const addedEquipment = addEquipment(rack.id, newEquipment);
+      const result = await addEquipment(rack.id, equipment);
       
-      if (addedEquipment) {
-        toast.success(`${equipmentType === 'switch' ? 'Switch' : 'Serveur'} ajouté avec succès`);
-        onEquipmentAdded(addedEquipment);
-        onOpenChange(false);
-        resetForm();
-      }
+      toast.success(`${type === 'switch' ? 'Switch' : 'Serveur'} ajouté avec succès`);
+      onOpenChange(false);
+      
+      resetForm();
+      
+      onEquipmentAdded(result);
     } catch (error: any) {
       toast.error(error.message || "Échec de l'ajout de l'équipement");
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -157,7 +169,6 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
               </TabsTrigger>
             </TabsList>
             
-            {/* Champs communs */}
             <div className="space-y-4 mb-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

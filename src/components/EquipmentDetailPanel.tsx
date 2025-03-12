@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Equipment, VirtualMachine, SwitchPort } from '@/types/rack';
 import { 
@@ -176,11 +175,15 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {equipment.vlans?.map((vlan, index) => (
-                      <Badge key={index} variant="outline" className="bg-secondary">
-                        {vlan}
-                      </Badge>
-                    ))}
+                    {equipment.vlans && equipment.vlans.length > 0 ? (
+                      equipment.vlans.map((vlan, index) => (
+                        <Badge key={index} variant="outline" className="bg-secondary">
+                          {vlan}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Aucun VLAN configuré</span>
+                    )}
                   </div>
                 </CardContent>
               </Card>
