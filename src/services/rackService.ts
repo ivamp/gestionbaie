@@ -105,6 +105,9 @@ export const addEquipment = async (
   equipment: Omit<Equipment, 'id'>
 ): Promise<Equipment> => {
   try {
+    // Debug log for the request
+    console.log("Add equipment request:", JSON.stringify(equipment, null, 2));
+    
     const response = await fetch(`${API_URL}/equipment/${rackId}`, {
       method: 'POST',
       headers: {
@@ -127,7 +130,9 @@ export const addEquipment = async (
       throw new Error(errorMessage);
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log("Add equipment response:", JSON.stringify(result, null, 2));
+    return result;
   } catch (error) {
     console.error(`Erreur lors de l'ajout d'un équipement à la baie ${rackId}:`, error);
     throw error;
@@ -141,6 +146,9 @@ export const updateEquipment = async (
   updates: Partial<Equipment>
 ): Promise<Equipment> => {
   try {
+    // Debug log for the update request
+    console.log("Update equipment request:", JSON.stringify(updates, null, 2));
+    
     const response = await fetch(`${API_URL}/equipment/${equipmentId}`, {
       method: 'PUT',
       headers: {
@@ -150,20 +158,31 @@ export const updateEquipment = async (
     });
     
     if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage;
+      // Improved error handling
+      let errorMessage = `Erreur HTTP: ${response.status}`;
       try {
-        // Essayer de parser le message d'erreur en JSON
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error || `Erreur HTTP: ${response.status}`;
+        const errorResponse = await response.json();
+        if (errorResponse && errorResponse.error) {
+          errorMessage = errorResponse.error;
+        }
       } catch (e) {
-        // Si le parsing échoue, utiliser le texte brut
-        errorMessage = `Erreur HTTP: ${response.status} - ${errorText.substring(0, 100)}...`;
+        // If the response is not JSON, try to get text
+        try {
+          const errorText = await response.text();
+          if (errorText) {
+            errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}...`;
+          }
+        } catch (textError) {
+          // Fallback if we can't get text either
+          console.error("Failed to parse error response:", textError);
+        }
       }
       throw new Error(errorMessage);
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log("Update equipment response:", JSON.stringify(result, null, 2));
+    return result;
   } catch (error) {
     console.error(`Erreur lors de la mise à jour de l'équipement ${equipmentId}:`, error);
     throw error;
@@ -276,6 +295,8 @@ export const updateSwitchPort = async (
   updates: Partial<SwitchPort>
 ): Promise<SwitchPort> => {
   try {
+    console.log("Updating switch port:", portId, "with data:", JSON.stringify(updates, null, 2));
+    
     const response = await fetch(`${API_URL}/switch-ports/${portId}`, {
       method: 'PUT',
       headers: {
@@ -285,18 +306,28 @@ export const updateSwitchPort = async (
     });
     
     if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage;
+      let errorMessage = `Erreur HTTP: ${response.status}`;
       try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error || `Erreur HTTP: ${response.status}`;
+        const errorResponse = await response.json();
+        if (errorResponse && errorResponse.error) {
+          errorMessage = errorResponse.error;
+        }
       } catch (e) {
-        errorMessage = `Erreur HTTP: ${response.status} - ${errorText.substring(0, 100)}...`;
+        try {
+          const errorText = await response.text();
+          if (errorText) {
+            errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}...`;
+          }
+        } catch (textError) {
+          console.error("Failed to parse error response:", textError);
+        }
       }
       throw new Error(errorMessage);
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log("Switch port update response:", JSON.stringify(result, null, 2));
+    return result;
   } catch (error) {
     console.error(`Erreur lors de la mise à jour du port ${portId}:`, error);
     throw error;

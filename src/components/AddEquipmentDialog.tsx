@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   Dialog, 
@@ -42,6 +43,8 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   const [brand, setBrand] = useState('');
   const [position, setPosition] = useState('');
   const [size, setSize] = useState('1');
+  
+  // Fix: Update type state when equipmentType changes
   const [type, setType] = useState<EquipmentType>('server');
   
   const [portCount, setPortCount] = useState('');
@@ -52,6 +55,11 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   const [description, setDescription] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Fix: Update type when equipmentType changes
+  React.useEffect(() => {
+    setType(equipmentType);
+  }, [equipmentType]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,20 +108,24 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     try {
       const equipment: Omit<Equipment, 'id'> = {
         name,
-        type: type as EquipmentType,
+        type: type, // Fix: Use the synchronized type state
         brand,
         position: positionNum,
         size: sizeNum,
       };
       
+      // Fix: Properly check type state when adding equipment-specific fields
       if (type === 'switch') {
         equipment.portCount = portCount ? parseInt(portCount) : undefined;
         equipment.ipAddress = ipAddress;
         equipment.vlans = vlans.split(',').map(vlan => vlan.trim()).filter(vlan => vlan);
+        equipment.ports = []; // Initialize empty ports array
       } else {
         equipment.idracIp = idracIp;
         equipment.description = description;
       }
+      
+      console.log("Adding equipment:", equipment); // Debug log
       
       const result = await addEquipment(rack.id, equipment);
       

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
@@ -18,10 +19,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Equipment, EquipmentType, Rack, VirtualMachine, SwitchPort } from '@/types/rack';
+import { Equipment, EquipmentType, Rack, VirtualMachine, SwitchPort, parseVlans, formatVlans } from '@/types/rack';
 import { Server, Cpu, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { updateEquipment, removeEquipment, addVirtualMachine, updateVirtualMachine, removeVirtualMachine } from '@/services/rackService';
+import { updateEquipment, removeEquipment, addVirtualMachine, updateVirtualMachine, removeVirtualMachine, updateSwitchPort } from '@/services/rackService';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -132,10 +133,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         updatedEquipment.ipAddress = ipAddress;
         
         // Assurons-nous que les VLANs sont correctement formatés et filtrés
-        const processedVlans = vlans
-          .split(',')
-          .map(vlan => vlan.trim())
-          .filter(vlan => vlan.length > 0);
+        const processedVlans = parseVlans(vlans);
         
         updatedEquipment.vlans = processedVlans;
         
@@ -241,6 +239,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     }
   };
   
+  // Fix: Improved port initialization
   const handleAddPort = () => {
     if (!ports.length && equipment.portCount) {
       // Initialiser les ports si aucun n'existe
@@ -253,6 +252,16 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         isFibre: false
       }));
       setPorts(initialPorts);
+      
+      // Also update the equipment with these ports immediately
+      updateEquipment(rack.id, equipment.id, { ports: initialPorts })
+        .then(() => {
+          toast.success("Ports initialisés avec succès");
+        })
+        .catch(error => {
+          toast.error("Échec de l'initialisation des ports");
+          console.error("Port initialization error:", error);
+        });
     } else if (equipment.portCount && ports.length < equipment.portCount) {
       // Ajouter un port supplémentaire
       const newPort: SwitchPort = {
@@ -263,34 +272,77 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         taggedVlans: [],
         isFibre: false
       };
-      setPorts([...ports, newPort]);
+      const updatedPorts = [...ports, newPort];
+      setPorts(updatedPorts);
+      
+      // Update equipment with the new port
+      updateEquipment(rack.id, equipment.id, { ports: updatedPorts })
+        .then(() => {
+          toast.success("Port ajouté avec succès");
+        })
+        .catch(error => {
+          toast.error("Échec de l'ajout du port");
+          console.error("Port addition error:", error);
+        });
     } else {
       toast.error(`Le nombre maximum de ports (${equipment.portCount}) est atteint`);
     }
   };
   
-  const handleUpdatePort = (portId: string, updates: Partial<SwitchPort>) => {
-    setPorts(ports.map(port => 
+  // Fix: Enhanced port update to call the API
+  const handleUpdatePort = async (portId: string, updates: Partial<SwitchPort>) => {
+    // Update local state first for immediate feedback
+    const updatedPorts = ports.map(port => 
       port.id === portId ? { ...port, ...updates } : port
-    ));
+    );
+    
+    setPorts(updatedPorts);
+    
+    try {
+      // Then update via API
+      await updateSwitchPort(equipment.id, portId, updates);
+      console.log(`Port ${portId} updated successfully with:`, updates);
+    } catch (error) {
+      console.error(`Error updating port ${portId}:`, error);
+      toast.error(`Échec de la mise à jour du port: ${(error as Error).message}`);
+    }
   };
   
-  const handleToggleVlanOnPort = (portId: string, vlan: string) => {
-    setPorts(ports.map(port => {
-      if (port.id === portId) {
-        const updatedVlans = [...port.taggedVlans];
-        const index = updatedVlans.indexOf(vlan);
-        
-        if (index === -1) {
-          updatedVlans.push(vlan);
-        } else {
-          updatedVlans.splice(index, 1);
-        }
-        
-        return { ...port, taggedVlans: updatedVlans };
-      }
-      return port;
-    }));
+  // Fix: Enhanced VLAN toggling to call the API
+  const handleToggleVlanOnPort = async (portId: string, vlan: string) => {
+    const port = ports.find(p => p.id === portId);
+    if (!port) {
+      console.error(`Port ${portId} not found`);
+      return;
+    }
+    
+    let updatedTaggedVlans = [...port.taggedVlans];
+    const index = updatedTaggedVlans.indexOf(vlan);
+    
+    if (index === -1) {
+      updatedTaggedVlans.push(vlan);
+    } else {
+      updatedTaggedVlans.splice(index, 1);
+    }
+    
+    // Update local state
+    const updatedPorts = ports.map(p => 
+      p.id === portId ? { ...p, taggedVlans: updatedTaggedVlans } : p
+    );
+    
+    setPorts(updatedPorts);
+    
+    try {
+      // Update via API
+      await updateSwitchPort(equipment.id, portId, { taggedVlans: updatedTaggedVlans });
+      console.log(`VLANs for port ${portId} updated to:`, updatedTaggedVlans);
+    } catch (error) {
+      console.error(`Error toggling VLAN on port ${portId}:`, error);
+      toast.error(`Échec de la mise à jour des VLANs: ${(error as Error).message}`);
+      
+      // Revert local state if API call fails
+      setPorts(ports);
+    }
   };
 
   return (
@@ -535,9 +587,12 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                 <div className="space-y-6">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-medium">Configuration des Ports</h3>
-                    <Button onClick={handleAddPort} disabled={equipment.portCount === ports.length}>
+                    <Button 
+                      onClick={handleAddPort} 
+                      disabled={equipment.portCount === ports.length || !equipment.portCount}
+                    >
                       <Plus className="mr-2 h-4 w-4" />
-                      Initialiser Ports
+                      {ports.length === 0 ? "Initialiser Ports" : "Ajouter Port"}
                     </Button>
                   </div>
                   
@@ -558,6 +613,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                               value={port.description}
                               placeholder="Description"
                               onChange={(e) => handleUpdatePort(port.id, { description: e.target.value })}
+                              onBlur={(e) => handleUpdatePort(port.id, { description: e.target.value })}
                               className="h-8 text-sm"
                             />
                           </div>
