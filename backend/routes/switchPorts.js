@@ -17,9 +17,10 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Port non trouvé' });
     }
     
-    // Mettre à jour le port
+    // Convertir taggedVlans en JSON si fourni
     const taggedVlansJson = taggedVlans ? JSON.stringify(taggedVlans) : port.taggedVlans;
     
+    // Mettre à jour le port
     await db.query(
       'UPDATE switch_ports SET description = ?, connected = ?, taggedVlans = ?, isFibre = ? WHERE id = ?',
       [

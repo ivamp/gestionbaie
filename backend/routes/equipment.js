@@ -47,28 +47,29 @@ router.post('/:rackId', async (req, res) => {
       return res.status(400).json({ error: "L'équipement chevauche un équipement existant" });
     }
     
+    // Préparer les VLANs si présents
+    const vlansJson = vlans ? JSON.stringify(vlans) : null;
+    
     // Ajouter l'équipement
     const id = uuidv4();
     await db.query(
-      'INSERT INTO equipment (id, rack_id, name, type, brand, position, size, portCount, ipAddress, idracIp, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, rackId, name, type, brand, position, size, portCount, ipAddress, idracIp, description]
+      'INSERT INTO equipment (id, rack_id, name, type, brand, position, size, portCount, ipAddress, idracIp, description, vlans) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, rackId, name, type, brand, position, size, portCount, ipAddress, idracIp, description, vlansJson]
     );
     
     // Récupérer l'équipement ajouté
     const [newEquipment] = await db.query('SELECT * FROM equipment WHERE id = ?', [id]);
     
-    // Ajouter les VLANs si présents (pour les switches)
-    if (type === 'switch' && vlans && Array.isArray(vlans) && vlans.length > 0) {
-      console.log("Adding VLANs to equipment:", vlans);
-      
-      // Stocker les VLANs dans une table séparée
-      await db.query(
-        'UPDATE equipment SET vlans = ? WHERE id = ?',
-        [JSON.stringify(vlans), id]
-      );
-      
-      // Ajouter les VLANs à l'objet de réponse
-      newEquipment.vlans = vlans;
+    // Parser les VLANs si présents
+    if (newEquipment.vlans) {
+      try {
+        newEquipment.vlans = JSON.parse(newEquipment.vlans);
+      } catch (e) {
+        newEquipment.vlans = [];
+        console.error("Error parsing VLANs:", e);
+      }
+    } else {
+      newEquipment.vlans = [];
     }
     
     // Si c'est un switch et qu'il a des ports, les créer
@@ -149,9 +150,12 @@ router.put('/:id', async (req, res) => {
       }
     }
     
+    // Préparer les VLANs si présents
+    const vlansJson = vlans ? JSON.stringify(vlans) : equipment.vlans;
+    
     // Mettre à jour l'équipement
     await db.query(
-      'UPDATE equipment SET name = ?, brand = ?, position = ?, size = ?, portCount = ?, ipAddress = ?, idracIp = ?, description = ? WHERE id = ?',
+      'UPDATE equipment SET name = ?, brand = ?, position = ?, size = ?, portCount = ?, ipAddress = ?, idracIp = ?, description = ?, vlans = ? WHERE id = ?',
       [
         name || equipment.name, 
         brand || equipment.brand, 
@@ -161,23 +165,15 @@ router.put('/:id', async (req, res) => {
         ipAddress || equipment.ipAddress, 
         idracIp || equipment.idracIp, 
         description || equipment.description,
+        vlansJson,
         id
       ]
     );
     
-    // Mettre à jour les VLANs si c'est un switch
-    if (equipment.type === 'switch' && vlans) {
-      console.log("Updating VLANs:", vlans);
-      await db.query(
-        'UPDATE equipment SET vlans = ? WHERE id = ?',
-        [JSON.stringify(vlans), id]
-      );
-    }
-    
     // Récupérer l'équipement mis à jour
     const [updatedEquipment] = await db.query('SELECT * FROM equipment WHERE id = ?', [id]);
     
-    // Gérer les VLANs dans la réponse
+    // Parser les VLANs dans la réponse
     if (updatedEquipment.vlans) {
       try {
         updatedEquipment.vlans = JSON.parse(updatedEquipment.vlans);
@@ -185,8 +181,8 @@ router.put('/:id', async (req, res) => {
         updatedEquipment.vlans = [];
         console.error("Error parsing VLANs:", e);
       }
-    } else if (vlans) {
-      updatedEquipment.vlans = vlans;
+    } else {
+      updatedEquipment.vlans = vlans || [];
     }
     
     // Si c'est un switch, récupérer ses ports

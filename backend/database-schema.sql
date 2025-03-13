@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS equipment (
   ipAddress VARCHAR(15),
   idracIp VARCHAR(15),
   description TEXT,
+  vlans JSON,
   FOREIGN KEY (rack_id) REFERENCES racks(id) ON DELETE CASCADE
 );
 
