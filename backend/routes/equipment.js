@@ -17,8 +17,11 @@ router.post('/:rackId', async (req, res) => {
       portCount, 
       ipAddress, 
       idracIp, 
-      description 
+      description,
+      vlans
     } = req.body;
+    
+    console.log("Creating equipment with request:", req.body);
     
     // Vérifier si la baie existe
     const [rack] = await db.query('SELECT * FROM racks WHERE id = ?', [rackId]);
@@ -54,6 +57,20 @@ router.post('/:rackId', async (req, res) => {
     // Récupérer l'équipement ajouté
     const [newEquipment] = await db.query('SELECT * FROM equipment WHERE id = ?', [id]);
     
+    // Ajouter les VLANs si présents (pour les switches)
+    if (type === 'switch' && vlans && Array.isArray(vlans) && vlans.length > 0) {
+      console.log("Adding VLANs to equipment:", vlans);
+      
+      // Stocker les VLANs dans une table séparée
+      await db.query(
+        'UPDATE equipment SET vlans = ? WHERE id = ?',
+        [JSON.stringify(vlans), id]
+      );
+      
+      // Ajouter les VLANs à l'objet de réponse
+      newEquipment.vlans = vlans;
+    }
+    
     // Si c'est un switch et qu'il a des ports, les créer
     if (type === 'switch' && portCount) {
       const portsPromises = Array.from({ length: portCount }, (_, i) => {
@@ -76,6 +93,7 @@ router.post('/:rackId', async (req, res) => {
     
     res.status(201).json(newEquipment);
   } catch (error) {
+    console.error("Equipment creation error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -92,8 +110,12 @@ router.put('/:id', async (req, res) => {
       portCount, 
       ipAddress, 
       idracIp, 
-      description 
+      description,
+      vlans,
+      ports
     } = req.body;
+    
+    console.log("Update equipment request:", JSON.stringify(req.body, null, 2));
     
     // Vérifier si l'équipement existe
     const [equipment] = await db.query('SELECT * FROM equipment WHERE id = ?', [id]);
@@ -143,8 +165,29 @@ router.put('/:id', async (req, res) => {
       ]
     );
     
+    // Mettre à jour les VLANs si c'est un switch
+    if (equipment.type === 'switch' && vlans) {
+      console.log("Updating VLANs:", vlans);
+      await db.query(
+        'UPDATE equipment SET vlans = ? WHERE id = ?',
+        [JSON.stringify(vlans), id]
+      );
+    }
+    
     // Récupérer l'équipement mis à jour
     const [updatedEquipment] = await db.query('SELECT * FROM equipment WHERE id = ?', [id]);
+    
+    // Gérer les VLANs dans la réponse
+    if (updatedEquipment.vlans) {
+      try {
+        updatedEquipment.vlans = JSON.parse(updatedEquipment.vlans);
+      } catch (e) {
+        updatedEquipment.vlans = [];
+        console.error("Error parsing VLANs:", e);
+      }
+    } else if (vlans) {
+      updatedEquipment.vlans = vlans;
+    }
     
     // Si c'est un switch, récupérer ses ports
     if (updatedEquipment.type === 'switch') {
@@ -165,11 +208,30 @@ router.put('/:id', async (req, res) => {
         await Promise.all(portsPromises);
       }
       
+      // Si des ports sont fournis, mettre à jour les ports existants
+      if (ports && Array.isArray(ports)) {
+        for (const port of ports) {
+          if (port.id) {
+            const taggedVlansJson = JSON.stringify(port.taggedVlans || []);
+            await db.query(
+              'UPDATE switch_ports SET description = ?, connected = ?, taggedVlans = ?, isFibre = ? WHERE id = ?',
+              [
+                port.description || '', 
+                port.connected ? 1 : 0, 
+                taggedVlansJson,
+                port.isFibre ? 1 : 0,
+                port.id
+              ]
+            );
+          }
+        }
+      }
+      
       // Récupérer les ports
       const ports = await db.query('SELECT * FROM switch_ports WHERE equipment_id = ?', [id]);
       updatedEquipment.ports = ports.map(port => ({
         ...port,
-        taggedVlans: JSON.parse(port.taggedVlans)
+        taggedVlans: JSON.parse(port.taggedVlans || '[]')
       }));
     } else if (updatedEquipment.type === 'server') {
       // Si c'est un serveur, récupérer ses VMs
@@ -177,8 +239,10 @@ router.put('/:id', async (req, res) => {
       updatedEquipment.virtualMachines = vms;
     }
     
+    console.log("Update equipment response:", JSON.stringify(updatedEquipment, null, 2));
     res.json(updatedEquipment);
   } catch (error) {
+    console.error("Equipment update error:", error);
     res.status(500).json({ error: error.message });
   }
 });

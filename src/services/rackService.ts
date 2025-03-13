@@ -31,7 +31,46 @@ export const getRack = async (id: string): Promise<Rack | undefined> => {
       }
       throw new Error(`Erreur HTTP: ${response.status}`);
     }
-    return await response.json();
+    const rack = await response.json();
+    
+    // S'assurer que les VLANs de chaque équipement sont correctement parsés
+    if (rack.equipment && Array.isArray(rack.equipment)) {
+      rack.equipment = rack.equipment.map(eq => {
+        if (eq.type === 'switch') {
+          // Vérifier si vlans est une string, dans ce cas la parser
+          if (eq.vlans && typeof eq.vlans === 'string') {
+            try {
+              eq.vlans = JSON.parse(eq.vlans);
+            } catch (e) {
+              console.error(`Erreur lors du parsing des VLANs pour l'équipement ${eq.id}:`, e);
+              eq.vlans = [];
+            }
+          } else if (!eq.vlans) {
+            eq.vlans = [];
+          }
+          
+          // Vérifier que les ports ont des taggedVlans corrects
+          if (eq.ports && Array.isArray(eq.ports)) {
+            eq.ports = eq.ports.map(port => {
+              if (port.taggedVlans && typeof port.taggedVlans === 'string') {
+                try {
+                  port.taggedVlans = JSON.parse(port.taggedVlans);
+                } catch (e) {
+                  console.error(`Erreur lors du parsing des taggedVlans pour le port ${port.id}:`, e);
+                  port.taggedVlans = [];
+                }
+              } else if (!port.taggedVlans) {
+                port.taggedVlans = [];
+              }
+              return port;
+            });
+          }
+        }
+        return eq;
+      });
+    }
+    
+    return rack;
   } catch (error) {
     console.error(`Erreur lors de la récupération de la baie ${id}:`, error);
     throw error;
@@ -139,15 +178,20 @@ export const addEquipment = async (
     console.log("Add equipment response:", JSON.stringify(result, null, 2));
     
     // Si c'est un switch mais que les VLANs ne sont pas dans la réponse, ajoutons-les manuellement
-    if (equipment.type === 'switch' && equipment.vlans && !result.vlans) {
-      result.vlans = equipment.vlans;
-      
-      // Mettre à jour immédiatement l'équipement avec les VLANs
-      try {
-        await updateEquipment(rackId, result.id, { vlans: equipment.vlans });
-        console.log("VLANs ajoutés à l'équipement après création:", equipment.vlans);
-      } catch (error) {
-        console.error("Erreur lors de l'ajout des VLANs après création:", error);
+    if (equipment.type === 'switch') {
+      // Si vlans existe dans la réponse mais est une string JSON, parsons-la
+      if (result.vlans && typeof result.vlans === 'string') {
+        try {
+          result.vlans = JSON.parse(result.vlans);
+        } catch (e) {
+          console.error("Erreur lors du parsing des VLANs dans la réponse:", e);
+          result.vlans = equipment.vlans || [];
+        }
+      } 
+      // Si vlans n'existe pas dans la réponse mais existe dans la requête
+      else if (!result.vlans && equipment.vlans) {
+        result.vlans = equipment.vlans;
+        console.log("VLANs ajoutés manuellement au résultat:", equipment.vlans);
       }
     }
     
@@ -202,10 +246,36 @@ export const updateEquipment = async (
     const result = await response.json();
     console.log("Update equipment response:", JSON.stringify(result, null, 2));
     
-    // Si les VLANs sont mis à jour, mais absents de la réponse, ajoutons-les manuellement au résultat
-    if (updates.vlans && !result.vlans) {
+    // Si les VLANs sont mis à jour, mais sont une string JSON dans la réponse, parsons-les
+    if (result.vlans && typeof result.vlans === 'string') {
+      try {
+        result.vlans = JSON.parse(result.vlans);
+      } catch (e) {
+        console.error("Erreur lors du parsing des VLANs dans la réponse:", e);
+        result.vlans = updates.vlans || [];
+      }
+    }
+    // Si les VLANs sont absents de la réponse mais présents dans la requête
+    else if (!result.vlans && updates.vlans) {
       result.vlans = updates.vlans;
       console.log("VLANs ajoutés manuellement au résultat:", updates.vlans);
+    }
+    
+    // Vérifier que les taggedVlans des ports sont correctement parsés
+    if (result.ports && Array.isArray(result.ports)) {
+      result.ports = result.ports.map(port => {
+        if (port.taggedVlans && typeof port.taggedVlans === 'string') {
+          try {
+            port.taggedVlans = JSON.parse(port.taggedVlans);
+          } catch (e) {
+            console.error(`Erreur lors du parsing des taggedVlans pour le port ${port.id}:`, e);
+            port.taggedVlans = [];
+          }
+        } else if (!port.taggedVlans) {
+          port.taggedVlans = [];
+        }
+        return port;
+      });
     }
     
     return result;
@@ -355,8 +425,15 @@ export const updateSwitchPort = async (
     const result = await response.json();
     console.log("Switch port update response:", JSON.stringify(result, null, 2));
     
-    // S'assurer que les taggedVlans sont correctement gérés
-    if (updates.taggedVlans && !result.taggedVlans) {
+    // S'assurer que taggedVlans est un array et pas une string
+    if (result.taggedVlans && typeof result.taggedVlans === 'string') {
+      try {
+        result.taggedVlans = JSON.parse(result.taggedVlans);
+      } catch (e) {
+        console.error(`Erreur lors du parsing des taggedVlans pour le port ${portId}:`, e);
+        result.taggedVlans = updates.taggedVlans || [];
+      }
+    } else if (!result.taggedVlans && updates.taggedVlans) {
       result.taggedVlans = updates.taggedVlans;
       console.log("taggedVlans ajoutés manuellement au résultat:", updates.taggedVlans);
     }

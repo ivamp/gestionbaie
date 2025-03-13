@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Equipment, VirtualMachine, SwitchPort } from '@/types/rack';
 import { 
@@ -128,6 +129,10 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
     }
   }, [equipment]);
 
+  // S'assurer que vlans est toujours un array
+  const vlans = Array.isArray(equipment.vlans) ? equipment.vlans : 
+               equipment.vlans ? [equipment.vlans] : [];
+
   return (
     <div className="space-y-6 animate-slide-up">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -194,8 +199,8 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {Array.isArray(equipment.vlans) && equipment.vlans.length > 0 ? (
-                      equipment.vlans.map((vlan, index) => (
+                    {vlans.length > 0 ? (
+                      vlans.map((vlan, index) => (
                         <Badge key={index} variant="outline" className="bg-secondary">
                           {vlan}
                         </Badge>
@@ -232,7 +237,7 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
           
           <TabsContent value="ports" className="mt-4">
             {equipment.ports && equipment.ports.length > 0 ? (
-              <SwitchPortsTable ports={equipment.ports} vlans={equipment.vlans} />
+              <SwitchPortsTable ports={equipment.ports} vlans={vlans} />
             ) : (
               <div className="text-center py-12 border rounded-lg bg-muted/30">
                 <LayoutGrid className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
