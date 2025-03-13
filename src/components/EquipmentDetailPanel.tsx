@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Equipment, VirtualMachine, SwitchPort } from '@/types/rack';
 import { 
   Card, 
@@ -56,6 +56,11 @@ const VirtualMachineCard: React.FC<{ vm: VirtualMachine }> = ({ vm }) => {
 };
 
 const SwitchPortsTable: React.FC<{ ports: SwitchPort[], vlans: string[] | undefined }> = ({ ports, vlans }) => {
+  useEffect(() => {
+    console.log("SwitchPortsTable - ports:", ports);
+    console.log("SwitchPortsTable - vlans disponibles:", vlans);
+  }, [ports, vlans]);
+
   return (
     <div className="space-y-4">
       <div className="border rounded-lg overflow-hidden">
@@ -67,41 +72,47 @@ const SwitchPortsTable: React.FC<{ ports: SwitchPort[], vlans: string[] | undefi
         </div>
         
         <ScrollArea className="h-[300px]">
-          {ports.map((port) => (
-            <div 
-              key={port.id} 
-              className="px-4 py-2 text-sm border-t grid grid-cols-12 gap-2 items-center"
-            >
-              <div className="col-span-1 font-medium">{port.portNumber}</div>
-              <div className="col-span-4">{port.description || "-"}</div>
-              <div className="col-span-2 flex items-center">
-                {port.connected ? (
-                  <span className="flex items-center text-green-600">
-                    <CheckCircle2 className="mr-1 h-3 w-3" />
-                    Connecté
-                  </span>
-                ) : (
-                  <span className="flex items-center text-muted-foreground">
-                    <XCircle className="mr-1 h-3 w-3" />
-                    Libre
-                  </span>
-                )}
-              </div>
-              <div className="col-span-5">
-                <div className="flex flex-wrap gap-1">
-                  {port.taggedVlans.length > 0 ? (
-                    port.taggedVlans.map((vlan, index) => (
-                      <Badge key={index} variant="outline" className="bg-primary/10 text-xs">
-                        {vlan}
-                      </Badge>
-                    ))
+          {ports && ports.length > 0 ? (
+            ports.map((port) => (
+              <div 
+                key={port.id} 
+                className="px-4 py-2 text-sm border-t grid grid-cols-12 gap-2 items-center"
+              >
+                <div className="col-span-1 font-medium">{port.portNumber}</div>
+                <div className="col-span-4">{port.description || "-"}</div>
+                <div className="col-span-2 flex items-center">
+                  {port.connected ? (
+                    <span className="flex items-center text-green-600">
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      Connecté
+                    </span>
                   ) : (
-                    <span className="text-xs text-muted-foreground">Aucun VLAN taggé</span>
+                    <span className="flex items-center text-muted-foreground">
+                      <XCircle className="mr-1 h-3 w-3" />
+                      Libre
+                    </span>
                   )}
                 </div>
+                <div className="col-span-5">
+                  <div className="flex flex-wrap gap-1">
+                    {Array.isArray(port.taggedVlans) && port.taggedVlans.length > 0 ? (
+                      port.taggedVlans.map((vlan, index) => (
+                        <Badge key={index} variant="outline" className="bg-primary/10 text-xs">
+                          {vlan}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Aucun VLAN taggé</span>
+                    )}
+                  </div>
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="py-4 text-center text-muted-foreground">
+              Aucun port configuré
             </div>
-          ))}
+          )}
         </ScrollArea>
       </div>
     </div>
@@ -109,6 +120,14 @@ const SwitchPortsTable: React.FC<{ ports: SwitchPort[], vlans: string[] | undefi
 };
 
 const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }) => {
+  useEffect(() => {
+    console.log("EquipmentDetailPanel - equipment:", equipment);
+    if (equipment.type === 'switch') {
+      console.log("VLANs disponibles:", equipment.vlans);
+      console.log("Ports:", equipment.ports);
+    }
+  }, [equipment]);
+
   return (
     <div className="space-y-6 animate-slide-up">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -175,7 +194,7 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {equipment.vlans && equipment.vlans.length > 0 ? (
+                    {Array.isArray(equipment.vlans) && equipment.vlans.length > 0 ? (
                       equipment.vlans.map((vlan, index) => (
                         <Badge key={index} variant="outline" className="bg-secondary">
                           {vlan}

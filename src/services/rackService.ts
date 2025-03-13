@@ -105,6 +105,11 @@ export const addEquipment = async (
   equipment: Omit<Equipment, 'id'>
 ): Promise<Equipment> => {
   try {
+    // Assurons-nous que les VLANs sont inclus dans la requête s'il s'agit d'un switch
+    if (equipment.type === 'switch' && equipment.vlans) {
+      console.log("Ajout d'équipement avec VLANs:", equipment.vlans);
+    }
+    
     // Debug log for the request
     console.log("Add equipment request:", JSON.stringify(equipment, null, 2));
     
@@ -132,6 +137,20 @@ export const addEquipment = async (
     
     const result = await response.json();
     console.log("Add equipment response:", JSON.stringify(result, null, 2));
+    
+    // Si c'est un switch mais que les VLANs ne sont pas dans la réponse, ajoutons-les manuellement
+    if (equipment.type === 'switch' && equipment.vlans && !result.vlans) {
+      result.vlans = equipment.vlans;
+      
+      // Mettre à jour immédiatement l'équipement avec les VLANs
+      try {
+        await updateEquipment(rackId, result.id, { vlans: equipment.vlans });
+        console.log("VLANs ajoutés à l'équipement après création:", equipment.vlans);
+      } catch (error) {
+        console.error("Erreur lors de l'ajout des VLANs après création:", error);
+      }
+    }
+    
     return result;
   } catch (error) {
     console.error(`Erreur lors de l'ajout d'un équipement à la baie ${rackId}:`, error);
@@ -182,6 +201,13 @@ export const updateEquipment = async (
     
     const result = await response.json();
     console.log("Update equipment response:", JSON.stringify(result, null, 2));
+    
+    // Si les VLANs sont mis à jour, mais absents de la réponse, ajoutons-les manuellement au résultat
+    if (updates.vlans && !result.vlans) {
+      result.vlans = updates.vlans;
+      console.log("VLANs ajoutés manuellement au résultat:", updates.vlans);
+    }
+    
     return result;
   } catch (error) {
     console.error(`Erreur lors de la mise à jour de l'équipement ${equipmentId}:`, error);
@@ -265,6 +291,7 @@ export const updateVirtualMachine = async (
     }
     
     return await response.json();
+    
   } catch (error) {
     console.error(`Erreur lors de la mise à jour de la VM ${vmId}:`, error);
     throw error;
@@ -327,6 +354,13 @@ export const updateSwitchPort = async (
     
     const result = await response.json();
     console.log("Switch port update response:", JSON.stringify(result, null, 2));
+    
+    // S'assurer que les taggedVlans sont correctement gérés
+    if (updates.taggedVlans && !result.taggedVlans) {
+      result.taggedVlans = updates.taggedVlans;
+      console.log("taggedVlans ajoutés manuellement au résultat:", updates.taggedVlans);
+    }
+    
     return result;
   } catch (error) {
     console.error(`Erreur lors de la mise à jour du port ${portId}:`, error);
