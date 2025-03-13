@@ -252,7 +252,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
   
   // Amélioré: Initialisation et gestion des ports
   const handleInitPorts = async () => {
-    if (!equipment.portCount) {
+    if (!equipment.portCount && !portCount) {
       toast.error("Le nombre de ports n'est pas défini");
       return;
     }
@@ -261,12 +261,17 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     
     try {
       // Initialiser les ports si aucun n'existe
-      const count = parseInt(portCount || '0') || equipment.portCount;
+      const count = parseInt(portCount || '0') || equipment.portCount || 0;
       if (!count) {
         toast.error("Nombre de ports invalide");
+        setIsSubmitting(false);
         return;
       }
       
+      // Préparer les VLANs
+      const processedVlans = parseVlans(vlans);
+      
+      // Créer des ports temporaires avec des IDs fictifs
       const initialPorts = Array.from({ length: count }, (_, i) => ({
         id: `temp-port-${Date.now()}-${i}`, // ID temporaire, le backend l'ignorera
         equipment_id: equipment.id,
@@ -280,20 +285,25 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
       // Mettre à jour les ports localement
       setPorts(initialPorts);
       
-      // Mettre à jour l'équipement avec ces ports
+      // Préparer l'objet de mise à jour sans référence circulaire
       const updatedEquipment = {
-        ...equipment,
-        ports: initialPorts,
-        portCount: count
+        portCount: count,
+        vlans: processedVlans,
+        ports: initialPorts
       };
       
       const result = await updateEquipment(rack.id, equipment.id, updatedEquipment);
       
-      setPorts(result.ports || []);
+      // Mettre à jour l'affichage avec les ports reçus du serveur
+      if (result.ports && Array.isArray(result.ports)) {
+        setPorts(result.ports);
+      }
+      
       toast.success("Ports initialisés avec succès");
       
       // Mettre à jour l'équipement affiché
       onEquipmentUpdated(result);
+      setIsDirty(false);
     } catch (error: any) {
       toast.error(error.message || "Échec de l'initialisation des ports");
       console.error("Port initialization error:", error);
@@ -333,7 +343,8 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
       return;
     }
     
-    let updatedTaggedVlans = [...port.taggedVlans];
+    // Assurer que taggedVlans est un array
+    let updatedTaggedVlans = Array.isArray(port.taggedVlans) ? [...port.taggedVlans] : [];
     const index = updatedTaggedVlans.indexOf(vlan);
     
     if (index === -1) {
@@ -400,342 +411,340 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
             <TabsTrigger value="danger" className="text-destructive">Danger</TabsTrigger>
           </TabsList>
           
-          <div className="flex-1 overflow-auto">
-            <ScrollArea className="h-[400px] w-full">
-              <div className="p-1">
-                <TabsContent value="general" className="mt-0">
-                  <form id="edit-form" onSubmit={handleSubmit} className="space-y-4 mb-4">
-                    <div className="grid grid-cols-2 gap-4">
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea className="h-[400px] w-full pr-4">
+              <TabsContent value="general" className="mt-0">
+                <form id="edit-form" onSubmit={handleSubmit} className="space-y-4 mb-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="position">Position (U)</Label>
+                      <Input
+                        id="position"
+                        placeholder="1-42"
+                        value={position}
+                        onChange={(e) => setPosition(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="size">Taille (U)</Label>
+                      <Select value={size} onValueChange={setSize}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner taille" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((u) => (
+                            <SelectItem key={u} value={u.toString()}>
+                              {u}U
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nom</Label>
+                    <Input
+                      id="name"
+                      placeholder="Nom de l'appareil"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="brand">Marque/Modèle</Label>
+                    <Input
+                      id="brand"
+                      placeholder="ex. Dell PowerEdge R740"
+                      value={brand}
+                      onChange={(e) => setBrand(e.target.value)}
+                    />
+                  </div>
+                  
+                  {equipment.type === 'server' && (
+                    <>
                       <div className="space-y-2">
-                        <Label htmlFor="position">Position (U)</Label>
+                        <Label htmlFor="idracIp">Adresse IP iDRAC</Label>
                         <Input
-                          id="position"
-                          placeholder="1-42"
-                          value={position}
-                          onChange={(e) => setPosition(e.target.value)}
+                          id="idracIp"
+                          placeholder="ex. 192.168.1.100"
+                          value={idracIp}
+                          onChange={(e) => setIdracIp(e.target.value)}
                         />
                       </div>
+                      
                       <div className="space-y-2">
-                        <Label htmlFor="size">Taille (U)</Label>
-                        <Select value={size} onValueChange={setSize}>
+                        <Label htmlFor="description">Description</Label>
+                        <Input
+                          id="description"
+                          placeholder="Description du serveur"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+                  
+                  {equipment.type === 'switch' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="portCount">Nombre de Ports</Label>
+                        <Select value={portCount} onValueChange={setPortCount}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner taille" />
+                            <SelectValue placeholder="Nombre de ports" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((u) => (
-                              <SelectItem key={u} value={u.toString()}>
-                                {u}U
+                            {[8, 12, 16, 24, 48, 96].map((count) => (
+                              <SelectItem key={count} value={count.toString()}>
+                                {count} ports
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nom</Label>
-                      <Input
-                        id="name"
-                        placeholder="Nom de l'appareil"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="brand">Marque/Modèle</Label>
-                      <Input
-                        id="brand"
-                        placeholder="ex. Dell PowerEdge R740"
-                        value={brand}
-                        onChange={(e) => setBrand(e.target.value)}
-                      />
-                    </div>
-                    
-                    {equipment.type === 'server' && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="idracIp">Adresse IP iDRAC</Label>
-                          <Input
-                            id="idracIp"
-                            placeholder="ex. 192.168.1.100"
-                            value={idracIp}
-                            onChange={(e) => setIdracIp(e.target.value)}
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="description">Description</Label>
-                          <Input
-                            id="description"
-                            placeholder="Description du serveur"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                          />
-                        </div>
-                      </>
-                    )}
-                    
-                    {equipment.type === 'switch' && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="portCount">Nombre de Ports</Label>
-                          <Select value={portCount} onValueChange={setPortCount}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Nombre de ports" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {[8, 12, 16, 24, 48, 96].map((count) => (
-                                <SelectItem key={count} value={count.toString()}>
-                                  {count} ports
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="ipAddress">Adresse IP</Label>
-                          <Input
-                            id="ipAddress"
-                            placeholder="ex. 192.168.1.1"
-                            value={ipAddress}
-                            onChange={(e) => setIpAddress(e.target.value)}
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="vlans">VLANs (séparés par des virgules)</Label>
-                          <Input
-                            id="vlans"
-                            placeholder="ex. VLAN 10, VLAN 20"
-                            value={vlans}
-                            onChange={(e) => setVlans(e.target.value)}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </form>
-                </TabsContent>
-                
-                <TabsContent value="vms" className="mt-0">
-                  <div className="space-y-6">
-                    <div className="bg-muted/40 p-4 rounded-lg space-y-4">
-                      <h3 className="text-lg font-medium">Ajouter une Machine Virtuelle</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="vmName">Nom</Label>
-                          <Input
-                            id="vmName"
-                            placeholder="Nom de la VM"
-                            value={newVmName}
-                            onChange={(e) => setNewVmName(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="vmIp">Adresse IP</Label>
-                          <Input
-                            id="vmIp"
-                            placeholder="ex. 192.168.1.101"
-                            value={newVmIp}
-                            onChange={(e) => setNewVmIp(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="vmDesc">Description</Label>
-                          <Input
-                            id="vmDesc"
-                            placeholder="Description de la VM"
-                            value={newVmDescription}
-                            onChange={(e) => setNewVmDescription(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="vmAnydesk">Code Anydesk</Label>
-                          <Input
-                            id="vmAnydesk"
-                            placeholder="ex. AD-123456"
-                            value={newVmAnydesk}
-                            onChange={(e) => setNewVmAnydesk(e.target.value)}
-                          />
-                        </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="ipAddress">Adresse IP</Label>
+                        <Input
+                          id="ipAddress"
+                          placeholder="ex. 192.168.1.1"
+                          value={ipAddress}
+                          onChange={(e) => setIpAddress(e.target.value)}
+                        />
                       </div>
-                      <Button onClick={handleAddVm} className="w-full mt-2" disabled={isSubmitting}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Ajouter VM
-                      </Button>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="vlans">VLANs (séparés par des virgules)</Label>
+                        <Input
+                          id="vlans"
+                          placeholder="ex. VLAN 10, VLAN 20"
+                          value={vlans}
+                          onChange={(e) => setVlans(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="vms" className="mt-0">
+                <div className="space-y-6">
+                  <div className="bg-muted/40 p-4 rounded-lg space-y-4">
+                    <h3 className="text-lg font-medium">Ajouter une Machine Virtuelle</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="vmName">Nom</Label>
+                        <Input
+                          id="vmName"
+                          placeholder="Nom de la VM"
+                          value={newVmName}
+                          onChange={(e) => setNewVmName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vmIp">Adresse IP</Label>
+                        <Input
+                          id="vmIp"
+                          placeholder="ex. 192.168.1.101"
+                          value={newVmIp}
+                          onChange={(e) => setNewVmIp(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vmDesc">Description</Label>
+                        <Input
+                          id="vmDesc"
+                          placeholder="Description de la VM"
+                          value={newVmDescription}
+                          onChange={(e) => setNewVmDescription(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vmAnydesk">Code Anydesk</Label>
+                        <Input
+                          id="vmAnydesk"
+                          placeholder="ex. AD-123456"
+                          value={newVmAnydesk}
+                          onChange={(e) => setNewVmAnydesk(e.target.value)}
+                        />
+                      </div>
                     </div>
-                    
-                    <Separator />
-                    
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Machines Virtuelles Existantes</h3>
-                      {virtualMachines.length > 0 ? (
-                        <div className="space-y-4">
-                          {virtualMachines.map((vm) => (
-                            <div key={vm.id} className="border rounded-lg p-4 bg-background">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <h4 className="font-medium">{vm.name}</h4>
-                                  <p className="text-sm text-muted-foreground">{vm.description}</p>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleRemoveVm(vm.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2 mt-2">
-                                <div>
-                                  <span className="text-xs text-muted-foreground">IP:</span>{" "}
-                                  <span className="font-mono">{vm.ipAddress}</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Anydesk:</span>{" "}
-                                  <span className="font-mono">{vm.anydeskCode}</span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center p-8 border rounded-lg bg-muted/30">
-                          <p className="text-muted-foreground">
-                            Aucune machine virtuelle n'a été ajoutée à ce serveur.
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <Button onClick={handleAddVm} className="w-full mt-2" disabled={isSubmitting}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Ajouter VM
+                    </Button>
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="ports" className="mt-0">
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium">Configuration des Ports</h3>
-                      <Button 
-                        onClick={handleInitPorts} 
-                        disabled={isSubmitting}
-                        variant="outline"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        {ports.length === 0 ? "Initialiser Ports" : "Réinitialiser Ports"}
-                      </Button>
-                    </div>
-                    
-                    {ports.length > 0 ? (
-                      <>
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-12 gap-2 py-2 px-4 bg-muted rounded-lg text-sm font-medium">
-                            <div className="col-span-1">N°</div>
-                            <div className="col-span-3">Description</div>
-                            <div className="col-span-1">État</div>
-                            <div className="col-span-7">VLANs</div>
-                          </div>
-                          
-                          {ports.map((port) => (
-                            <div key={port.id} className="grid grid-cols-12 gap-2 items-center border rounded-lg p-3">
-                              <div className="col-span-1 font-medium">{port.portNumber}</div>
-                              <div className="col-span-3">
-                                <Input
-                                  value={port.description || ''}
-                                  placeholder="Description"
-                                  onChange={(e) => handleUpdatePort(port.id, { description: e.target.value })}
-                                  className="h-8 text-sm"
-                                />
+                  
+                  <Separator />
+                  
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Machines Virtuelles Existantes</h3>
+                    {virtualMachines.length > 0 ? (
+                      <div className="space-y-4">
+                        {virtualMachines.map((vm) => (
+                          <div key={vm.id} className="border rounded-lg p-4 bg-background">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-medium">{vm.name}</h4>
+                                <p className="text-sm text-muted-foreground">{vm.description}</p>
                               </div>
-                              <div className="col-span-1">
-                                <Select
-                                  value={port.connected ? "true" : "false"}
-                                  onValueChange={(value) => handleUpdatePort(port.id, { connected: value === "true" })}
-                                >
-                                  <SelectTrigger className="h-8">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="true">Connecté</SelectItem>
-                                    <SelectItem value="false">Libre</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleRemoveVm(vm.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              <div>
+                                <span className="text-xs text-muted-foreground">IP:</span>{" "}
+                                <span className="font-mono">{vm.ipAddress}</span>
                               </div>
-                              <div className="col-span-7 flex flex-wrap gap-1">
-                                {equipment.vlans && equipment.vlans.length > 0 ? (
-                                  equipment.vlans.map((vlan) => (
-                                    <button
-                                      key={`${port.id}-${vlan}`}
-                                      type="button"
-                                      className={`px-2 py-1 text-xs rounded ${
-                                        port.taggedVlans.includes(vlan)
-                                          ? 'bg-primary text-white'
-                                          : 'bg-muted'
-                                      }`}
-                                      onClick={() => handleToggleVlanOnPort(port.id, vlan)}
-                                    >
-                                      {vlan}
-                                    </button>
-                                  ))
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">
-                                    Ajoutez des VLANs dans l'onglet "Général"
-                                  </span>
-                                )}
+                              <div>
+                                <span className="text-xs text-muted-foreground">Anydesk:</span>{" "}
+                                <span className="font-mono">{vm.anydeskCode}</span>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                        
-                        {/* Bouton d'enregistrement des ports */}
-                        <div className="flex justify-end">
-                          <Button 
-                            type="button" 
-                            onClick={handleSubmit} 
-                            disabled={isSubmitting || !isDirty}
-                          >
-                            <Save className="mr-2 h-4 w-4" />
-                            Enregistrer les changements
-                          </Button>
-                        </div>
-                      </>
+                          </div>
+                        ))}
+                      </div>
                     ) : (
                       <div className="text-center p-8 border rounded-lg bg-muted/30">
                         <p className="text-muted-foreground">
-                          Cliquez sur "Initialiser Ports" pour configurer les ports de ce switch.
+                          Aucune machine virtuelle n'a été ajoutée à ce serveur.
                         </p>
                       </div>
                     )}
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="danger" className="mt-0">
-                  <div className="space-y-4">
-                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                      <h3 className="text-lg font-medium text-destructive">Zone de Danger</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Les actions ci-dessous sont irréversibles. Procédez avec prudence.
-                      </p>
-                    </div>
-                    
-                    <div className="p-4 border rounded-lg">
-                      <h4 className="font-medium mb-2">Supprimer cet équipement</h4>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Cette action supprimera définitivement {equipment.name} de la baie.
-                        {equipment.type === 'server' && equipment.virtualMachines && equipment.virtualMachines.length > 0 && 
-                          ` Toutes les ${equipment.virtualMachines.length} machines virtuelles associées seront également supprimées.`}
-                      </p>
-                      <Button 
-                        variant="destructive" 
-                        onClick={handleDeleteEquipment}
-                        disabled={isSubmitting}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Supprimer {equipment.type === 'switch' ? 'ce Switch' : 'ce Serveur'}
-                      </Button>
-                    </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="ports" className="mt-0">
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Configuration des Ports</h3>
+                    <Button 
+                      onClick={handleInitPorts} 
+                      disabled={isSubmitting}
+                      variant="outline"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      {ports.length === 0 ? "Initialiser Ports" : "Réinitialiser Ports"}
+                    </Button>
                   </div>
-                </TabsContent>
-              </div>
+                  
+                  {ports.length > 0 ? (
+                    <>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-12 gap-2 py-2 px-4 bg-muted rounded-lg text-sm font-medium">
+                          <div className="col-span-1">N°</div>
+                          <div className="col-span-3">Description</div>
+                          <div className="col-span-1">État</div>
+                          <div className="col-span-7">VLANs</div>
+                        </div>
+                        
+                        {ports.map((port) => (
+                          <div key={port.id} className="grid grid-cols-12 gap-2 items-center border rounded-lg p-3">
+                            <div className="col-span-1 font-medium">{port.portNumber}</div>
+                            <div className="col-span-3">
+                              <Input
+                                value={port.description || ''}
+                                placeholder="Description"
+                                onChange={(e) => handleUpdatePort(port.id, { description: e.target.value })}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="col-span-1">
+                              <Select
+                                value={port.connected ? "true" : "false"}
+                                onValueChange={(value) => handleUpdatePort(port.id, { connected: value === "true" })}
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="true">Connecté</SelectItem>
+                                  <SelectItem value="false">Libre</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-7 flex flex-wrap gap-1">
+                              {equipment.vlans && equipment.vlans.length > 0 ? (
+                                equipment.vlans.map((vlan) => (
+                                  <button
+                                    key={`${port.id}-${vlan}`}
+                                    type="button"
+                                    className={`px-2 py-1 text-xs rounded ${
+                                      port.taggedVlans && Array.isArray(port.taggedVlans) && port.taggedVlans.includes(vlan)
+                                        ? 'bg-primary text-white'
+                                        : 'bg-muted'
+                                    }`}
+                                    onClick={() => handleToggleVlanOnPort(port.id, vlan)}
+                                  >
+                                    {vlan}
+                                  </button>
+                                ))
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  Ajoutez des VLANs dans l'onglet "Général"
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Bouton d'enregistrement des ports */}
+                      <div className="flex justify-end">
+                        <Button 
+                          type="button" 
+                          onClick={handleSubmit} 
+                          disabled={isSubmitting || !isDirty}
+                        >
+                          <Save className="mr-2 h-4 w-4" />
+                          Enregistrer les changements
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center p-8 border rounded-lg bg-muted/30">
+                      <p className="text-muted-foreground">
+                        Cliquez sur "Initialiser Ports" pour configurer les ports de ce switch.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="danger" className="mt-0">
+                <div className="space-y-4">
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                    <h3 className="text-lg font-medium text-destructive">Zone de Danger</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Les actions ci-dessous sont irréversibles. Procédez avec prudence.
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium mb-2">Supprimer cet équipement</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Cette action supprimera définitivement {equipment.name} de la baie.
+                      {equipment.type === 'server' && equipment.virtualMachines && equipment.virtualMachines.length > 0 && 
+                        ` Toutes les ${equipment.virtualMachines.length} machines virtuelles associées seront également supprimées.`}
+                    </p>
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleDeleteEquipment}
+                      disabled={isSubmitting}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Supprimer {equipment.type === 'switch' ? 'ce Switch' : 'ce Serveur'}
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
             </ScrollArea>
           </div>
           
