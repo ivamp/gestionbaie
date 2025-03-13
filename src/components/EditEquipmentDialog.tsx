@@ -146,23 +146,30 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         const processedVlans = parseVlans(vlans);
         
         updatedEquipment.vlans = processedVlans;
+        console.log("VLANs mis à jour:", processedVlans);
         
         // S'assurer que les ports ont les bons VLANs disponibles pour le tagging
-        const updatedPorts = ports.map(port => {
-          // Filtrer les VLANs tagués qui n'existent plus dans la liste des VLANs
-          const validTaggedVlans = port.taggedVlans.filter(tag => 
-            processedVlans.includes(tag)
-          );
+        if (ports && ports.length > 0) {
+          const updatedPorts = ports.map(port => {
+            // Assurer que taggedVlans est un array
+            if (!port.taggedVlans) {
+              return { ...port, taggedVlans: [] };
+            }
+            
+            // Filtrer les VLANs tagués qui n'existent plus dans la liste des VLANs
+            const validTaggedVlans = port.taggedVlans.filter(tag => 
+              processedVlans.includes(tag)
+            );
+            
+            return {
+              ...port,
+              taggedVlans: validTaggedVlans
+            };
+          });
           
-          return {
-            ...port,
-            taggedVlans: validTaggedVlans
-          };
-        });
-        
-        updatedEquipment.ports = updatedPorts;
-        console.log("VLANs mis à jour:", processedVlans);
-        console.log("Ports mis à jour:", updatedPorts);
+          updatedEquipment.ports = updatedPorts;
+          console.log("Ports mis à jour:", updatedPorts);
+        }
       } else {
         updatedEquipment.idracIp = idracIp;
         updatedEquipment.description = description;
@@ -285,13 +292,14 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
       // Mettre à jour les ports localement
       setPorts(initialPorts);
       
-      // Préparer l'objet de mise à jour sans référence circulaire
+      // Préparer l'objet de mise à jour
       const updatedEquipment = {
         portCount: count,
         vlans: processedVlans,
         ports: initialPorts
       };
       
+      // Envoyer la requête au serveur
       const result = await updateEquipment(rack.id, equipment.id, updatedEquipment);
       
       // Mettre à jour l'affichage avec les ports reçus du serveur
@@ -413,7 +421,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
           
           <div className="flex-1 overflow-hidden">
             <ScrollArea className="h-[400px] w-full pr-4">
-              <TabsContent value="general" className="mt-0">
+              <TabsContent value="general" className="mt-0 space-y-4">
                 <form id="edit-form" onSubmit={handleSubmit} className="space-y-4 mb-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -697,9 +705,9 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                       </div>
                       
                       {/* Bouton d'enregistrement des ports */}
-                      <div className="flex justify-end">
+                      <div className="flex justify-end pt-4">
                         <Button 
-                          type="button" 
+                          type="submit" 
                           onClick={handleSubmit} 
                           disabled={isSubmitting || !isDirty}
                         >

@@ -212,21 +212,24 @@ export const updateEquipment = async (
     // Debug log for the update request
     console.log("Update equipment request:", JSON.stringify(updates, null, 2));
     
-    // S'assurer que les ports ne sont pas utilisés avant leur initialisation
+    // Clone l'objet pour éviter de modifier l'original
     const requestData: Partial<Equipment> = { ...updates };
     
-    // Déplacé ici pour éviter "Cannot access ports before initialization"
-    if (requestData.ports) {
-      // Vérifier et normaliser les taggedVlans pour chaque port
+    // Traitement des ports - s'assurer que taggedVlans est un array pour chaque port
+    if (requestData.ports && Array.isArray(requestData.ports)) {
       requestData.ports = requestData.ports.map(port => {
+        // Créer une copie pour éviter de modifier l'original
+        const portCopy = { ...port };
+        
         // Assurer que taggedVlans est un array
-        if (!port.taggedVlans) {
-          port.taggedVlans = [];
+        if (!portCopy.taggedVlans) {
+          portCopy.taggedVlans = [];
         }
-        return port;
+        return portCopy;
       });
     }
     
+    // Envoyer la requête au serveur
     const response = await fetch(`${API_URL}/equipment/${equipmentId}`, {
       method: 'PUT',
       headers: {
