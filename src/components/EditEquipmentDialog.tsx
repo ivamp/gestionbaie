@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
@@ -43,19 +42,16 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
   onEquipmentUpdated,
   onEquipmentRemoved
 }) => {
-  // Common fields
   const [name, setName] = useState(equipment.name);
   const [brand, setBrand] = useState(equipment.brand);
   const [position, setPosition] = useState(equipment.position.toString());
   const [size, setSize] = useState(equipment.size.toString());
   
-  // Switch specific fields
   const [portCount, setPortCount] = useState(equipment.portCount?.toString() || '');
   const [ipAddress, setIpAddress] = useState(equipment.ipAddress || '');
   const [vlans, setVlans] = useState(equipment.vlans?.join(', ') || '');
   const [ports, setPorts] = useState<SwitchPort[]>(equipment.ports || []);
   
-  // Server specific fields
   const [idracIp, setIdracIp] = useState(equipment.idracIp || '');
   const [description, setDescription] = useState(equipment.description || '');
   const [virtualMachines, setVirtualMachines] = useState<VirtualMachine[]>(
@@ -68,9 +64,8 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
   const [newVmIp, setNewVmIp] = useState('');
   const [newVmAnydesk, setNewVmAnydesk] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDirty, setIsDirty] = useState(false); // Indique si des modifications ont été faites
-  
-  // Mise à jour des états lorsque l'équipement change
+  const [isDirty, setIsDirty] = useState(false);
+
   useEffect(() => {
     console.log("Equipment changed:", equipment);
     setName(equipment.name);
@@ -85,11 +80,9 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     setDescription(equipment.description || '');
     setVirtualMachines(equipment.virtualMachines || []);
     
-    // Réinitialiser isDirty quand l'équipement change
     setIsDirty(false);
   }, [equipment]);
   
-  // Marquer comme dirty quand des valeurs changent
   useEffect(() => {
     setIsDirty(true);
   }, [name, brand, position, size, portCount, ipAddress, vlans, ports, idracIp, description]);
@@ -101,7 +94,6 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     setIsSubmitting(true);
     
     try {
-      // Validation de base
       if (!name || !brand || !position || !size) {
         toast.error("Veuillez remplir tous les champs obligatoires");
         setIsSubmitting(false);
@@ -142,21 +134,17 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         }
         updatedEquipment.ipAddress = ipAddress;
         
-        // Assurons-nous que les VLANs sont correctement formatés et filtrés
         const processedVlans = parseVlans(vlans);
         
         updatedEquipment.vlans = processedVlans;
         console.log("VLANs mis à jour:", processedVlans);
         
-        // S'assurer que les ports ont les bons VLANs disponibles pour le tagging
         if (ports && ports.length > 0) {
           const updatedPorts = ports.map(port => {
-            // Assurer que taggedVlans est un array
             if (!port.taggedVlans) {
               return { ...port, taggedVlans: [] };
             }
             
-            // Filtrer les VLANs tagués qui n'existent plus dans la liste des VLANs
             const validTaggedVlans = port.taggedVlans.filter(tag => 
               processedVlans.includes(tag)
             );
@@ -176,7 +164,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         updatedEquipment.virtualMachines = virtualMachines;
       }
       
-      const result = await updateEquipment(rack.id, equipment.id, updatedEquipment);
+      const result = await updateEquipment(equipment.id, updatedEquipment);
       
       toast.success(`${equipment.type === 'switch' ? 'Switch' : 'Serveur'} mis à jour avec succès`);
       onEquipmentUpdated(result);
@@ -257,7 +245,6 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     }
   };
   
-  // Amélioré: Initialisation et gestion des ports
   const handleInitPorts = async () => {
     if (!equipment.portCount && !portCount) {
       toast.error("Le nombre de ports n'est pas défini");
@@ -267,7 +254,6 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     setIsSubmitting(true);
     
     try {
-      // Initialiser les ports si aucun n'existe
       const count = parseInt(portCount || '0') || equipment.portCount || 0;
       if (!count) {
         toast.error("Nombre de ports invalide");
@@ -275,12 +261,10 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         return;
       }
       
-      // Préparer les VLANs
       const processedVlans = parseVlans(vlans);
       
-      // Créer des ports temporaires avec des IDs fictifs
       const initialPorts = Array.from({ length: count }, (_, i) => ({
-        id: `temp-port-${Date.now()}-${i}`, // ID temporaire, le backend l'ignorera
+        id: `temp-port-${Date.now()}-${i}`,
         equipment_id: equipment.id,
         portNumber: i + 1,
         description: '',
@@ -289,27 +273,22 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
         isFibre: false
       }));
       
-      // Mettre à jour les ports localement
       setPorts(initialPorts);
       
-      // Préparer l'objet de mise à jour
       const updatedEquipment = {
         portCount: count,
         vlans: processedVlans,
         ports: initialPorts
       };
       
-      // Envoyer la requête au serveur
-      const result = await updateEquipment(rack.id, equipment.id, updatedEquipment);
+      const result = await updateEquipment(equipment.id, updatedEquipment);
       
-      // Mettre à jour l'affichage avec les ports reçus du serveur
       if (result.ports && Array.isArray(result.ports)) {
         setPorts(result.ports);
       }
       
       toast.success("Ports initialisés avec succès");
       
-      // Mettre à jour l'équipement affiché
       onEquipmentUpdated(result);
       setIsDirty(false);
     } catch (error: any) {
@@ -320,9 +299,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     }
   };
   
-  // Amélioré: mise à jour des ports
   const handleUpdatePort = async (portId: string, updates: Partial<SwitchPort>) => {
-    // Mise à jour optimiste de l'interface
     const updatedPorts = ports.map(port => 
       port.id === portId ? { ...port, ...updates } : port
     );
@@ -331,19 +308,16 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     setIsDirty(true);
     
     try {
-      // Mise à jour sur le serveur
-      await updateSwitchPort(equipment.id, portId, updates);
+      await updateSwitchPort(portId, updates);
       console.log(`Port ${portId} updated successfully with:`, updates);
     } catch (error) {
       console.error(`Error updating port ${portId}:`, error);
       toast.error(`Échec de la mise à jour du port: ${(error as Error).message}`);
       
-      // Restaurer l'état précédent en cas d'erreur
       setPorts(ports);
     }
   };
   
-  // Amélioré: gestion des VLANs sur les ports
   const handleToggleVlanOnPort = async (portId: string, vlan: string) => {
     const port = ports.find(p => p.id === portId);
     if (!port) {
@@ -351,7 +325,6 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
       return;
     }
     
-    // Assurer que taggedVlans est un array
     let updatedTaggedVlans = Array.isArray(port.taggedVlans) ? [...port.taggedVlans] : [];
     const index = updatedTaggedVlans.indexOf(vlan);
     
@@ -361,7 +334,6 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
       updatedTaggedVlans.splice(index, 1);
     }
     
-    // Mise à jour locale optimiste
     const updatedPorts = ports.map(p => 
       p.id === portId ? { ...p, taggedVlans: updatedTaggedVlans } : p
     );
@@ -370,19 +342,16 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     setIsDirty(true);
     
     try {
-      // Mise à jour sur le serveur
-      await updateSwitchPort(equipment.id, portId, { taggedVlans: updatedTaggedVlans });
+      await updateSwitchPort(portId, { taggedVlans: updatedTaggedVlans });
       console.log(`VLANs for port ${portId} updated to:`, updatedTaggedVlans);
     } catch (error) {
       console.error(`Error toggling VLAN on port ${portId}:`, error);
       toast.error(`Échec de la mise à jour des VLANs: ${(error as Error).message}`);
       
-      // Restaurer l'état précédent en cas d'erreur
       setPorts(ports);
     }
   };
   
-  // Fonction pour fermer le dialog avec confirmation si des modifications ont été faites
   const handleCloseWithConfirmation = () => {
     if (isDirty) {
       if (window.confirm("Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir fermer ?")) {
@@ -704,7 +673,6 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                         ))}
                       </div>
                       
-                      {/* Bouton d'enregistrement des ports */}
                       <div className="flex justify-end pt-4">
                         <Button 
                           type="submit" 
