@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -237,6 +236,10 @@ router.put('/:id', async (req, res) => {
     if (updatedEquipment.vlans) {
       try {
         updatedEquipment.vlans = JSON.parse(updatedEquipment.vlans);
+        // Vérification supplémentaire que vlans est un tableau valide
+        if (!Array.isArray(updatedEquipment.vlans)) {
+          updatedEquipment.vlans = [];
+        }
       } catch (e) {
         updatedEquipment.vlans = [];
         console.error("Error parsing VLANs:", e);

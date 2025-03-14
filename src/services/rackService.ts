@@ -1,4 +1,3 @@
-
 import { Equipment, Rack, RackSummary, VirtualMachine, SwitchPort } from '../types/rack';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -37,16 +36,24 @@ export const getRack = async (id: string): Promise<Rack | undefined> => {
     if (rack.equipment && Array.isArray(rack.equipment)) {
       rack.equipment = rack.equipment.map(eq => {
         if (eq.type === 'switch') {
+          // Débugging pour voir la valeur brute des VLANs reçus
+          console.log(`VLANs reçus pour l'équipement ${eq.id}:`, eq.vlans);
+          
           // Vérifier si vlans est une string, dans ce cas la parser
           if (eq.vlans && typeof eq.vlans === 'string') {
             try {
               eq.vlans = JSON.parse(eq.vlans);
+              console.log(`VLANs parsés pour l'équipement ${eq.id}:`, eq.vlans);
             } catch (e) {
               console.error(`Erreur lors du parsing des VLANs pour l'équipement ${eq.id}:`, e);
               eq.vlans = [];
             }
           } else if (!eq.vlans) {
+            // Si vlans est null ou undefined, initialiser un tableau vide
             eq.vlans = [];
+          } else if (Array.isArray(eq.vlans)) {
+            // Si c'est déjà un array, s'assurer qu'il n'y a pas d'éléments null ou undefined
+            eq.vlans = eq.vlans.filter(vlan => vlan !== null && vlan !== undefined);
           }
           
           // Vérifier que les ports ont des taggedVlans corrects
