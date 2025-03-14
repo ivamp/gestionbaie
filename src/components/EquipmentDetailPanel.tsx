@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Equipment, VirtualMachine, SwitchPort } from '@/types/rack';
 import { 

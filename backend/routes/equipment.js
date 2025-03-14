@@ -169,7 +169,7 @@ router.put('/:id', async (req, res) => {
       console.log("Update VLANs to:", vlansJson);
     }
     
-    // Mettre à jour l'équipement
+    // Mettre à jour l'équipement avec les nouveaux VLANs (même s'ils sont vides)
     await db.query(
       'UPDATE equipment SET name = ?, brand = ?, position = ?, size = ?, portCount = ?, ipAddress = ?, idracIp = ?, description = ?, vlans = ? WHERE id = ?',
       [

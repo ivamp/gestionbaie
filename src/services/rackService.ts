@@ -1,3 +1,4 @@
+
 import { Equipment, Rack, RackSummary, VirtualMachine, SwitchPort } from '../types/rack';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -151,6 +152,12 @@ export const addEquipment = async (
     // Clone l'objet pour éviter de modifier l'original
     const requestData = { ...equipment };
     
+    // S'assurer que vlans est bien un tableau et non pas undefined
+    if (equipment.type === 'switch') {
+      requestData.vlans = Array.isArray(requestData.vlans) ? requestData.vlans : 
+                          requestData.vlans ? [requestData.vlans] : [];
+    }
+    
     // Debug log for the request
     console.log("Add equipment request:", JSON.stringify(requestData, null, 2));
     
@@ -230,10 +237,9 @@ export const updateEquipment = async (
     const requestData: Partial<Equipment> = { ...updates };
     
     // S'assurer que vlans est un tableau si présent
-    if (requestData.vlans) {
-      if (!Array.isArray(requestData.vlans)) {
-        requestData.vlans = [requestData.vlans];
-      }
+    if (requestData.vlans !== undefined) {
+      requestData.vlans = Array.isArray(requestData.vlans) ? requestData.vlans : 
+                          requestData.vlans ? [requestData.vlans] : [];
     }
     
     // Préparer les ports avant d'envoyer la requête
@@ -441,7 +447,7 @@ export const updateSwitchPort = async (
     const requestData: Partial<SwitchPort> = { ...updates };
     
     // S'assurer que taggedVlans est un tableau
-    if (requestData.taggedVlans) {
+    if (requestData.taggedVlans !== undefined) {
       if (!Array.isArray(requestData.taggedVlans)) {
         requestData.taggedVlans = [requestData.taggedVlans as unknown as string];
       }
