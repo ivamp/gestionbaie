@@ -1,4 +1,3 @@
-
 import { Equipment, Rack, RackSummary, VirtualMachine, SwitchPort } from '../types/rack';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -149,15 +148,18 @@ export const addEquipment = async (
       console.log("Ajout d'équipement avec VLANs:", equipment.vlans);
     }
     
+    // Clone l'objet pour éviter de modifier l'original
+    const requestData = { ...equipment };
+    
     // Debug log for the request
-    console.log("Add equipment request:", JSON.stringify(equipment, null, 2));
+    console.log("Add equipment request:", JSON.stringify(requestData, null, 2));
     
     const response = await fetch(`${API_URL}/equipment/${rackId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(equipment),
+      body: JSON.stringify(requestData),
     });
     
     if (!response.ok) {
@@ -177,22 +179,35 @@ export const addEquipment = async (
     const result = await response.json();
     console.log("Add equipment response:", JSON.stringify(result, null, 2));
     
-    // Si c'est un switch mais que les VLANs ne sont pas dans la réponse, ajoutons-les manuellement
-    if (equipment.type === 'switch') {
-      // Si vlans existe dans la réponse mais est une string JSON, parsons-la
-      if (result.vlans && typeof result.vlans === 'string') {
-        try {
-          result.vlans = JSON.parse(result.vlans);
-        } catch (e) {
-          console.error("Erreur lors du parsing des VLANs dans la réponse:", e);
-          result.vlans = equipment.vlans || [];
-        }
-      } 
-      // Si vlans n'existe pas dans la réponse mais existe dans la requête
-      else if (!result.vlans && equipment.vlans) {
-        result.vlans = equipment.vlans;
-        console.log("VLANs ajoutés manuellement au résultat:", equipment.vlans);
+    // Si vlans est une string JSON dans la réponse, parser
+    if (result.vlans && typeof result.vlans === 'string') {
+      try {
+        result.vlans = JSON.parse(result.vlans);
+      } catch (e) {
+        console.error("Erreur lors du parsing des VLANs dans la réponse:", e);
+        result.vlans = [];
       }
+    } else if (!result.vlans) {
+      // Si vlans est undefined dans la réponse, initialiser un tableau vide
+      result.vlans = [];
+    }
+    
+    // S'assurer que les ports ont des taggedVlans correctement parsés
+    if (result.ports && Array.isArray(result.ports)) {
+      result.ports = result.ports.map(port => {
+        const portCopy = { ...port };
+        if (portCopy.taggedVlans && typeof portCopy.taggedVlans === 'string') {
+          try {
+            portCopy.taggedVlans = JSON.parse(portCopy.taggedVlans);
+          } catch (e) {
+            console.error(`Erreur lors du parsing des taggedVlans pour le port ${portCopy.id}:`, e);
+            portCopy.taggedVlans = [];
+          }
+        } else if (!portCopy.taggedVlans) {
+          portCopy.taggedVlans = [];
+        }
+        return portCopy;
+      });
     }
     
     return result;
@@ -204,7 +219,6 @@ export const addEquipment = async (
 
 // Mettre à jour un équipement
 export const updateEquipment = async (
-  rackId: string,
   equipmentId: string,
   updates: Partial<Equipment>
 ): Promise<Equipment> => {
@@ -215,18 +229,31 @@ export const updateEquipment = async (
     // Clone l'objet pour éviter de modifier l'original
     const requestData: Partial<Equipment> = { ...updates };
     
-    // Traitement des ports - s'assurer que taggedVlans est un array pour chaque port
+    // S'assurer que vlans est un tableau si présent
+    if (requestData.vlans) {
+      if (!Array.isArray(requestData.vlans)) {
+        requestData.vlans = [requestData.vlans];
+      }
+    }
+    
+    // Préparer les ports avant d'envoyer la requête
     if (requestData.ports && Array.isArray(requestData.ports)) {
-      requestData.ports = requestData.ports.map(port => {
-        // Créer une copie pour éviter de modifier l'original
+      const updatedPorts = requestData.ports.map(port => {
+        // Créer une copie du port pour éviter de modifier l'original
         const portCopy = { ...port };
         
-        // Assurer que taggedVlans est un array
+        // S'assurer que taggedVlans est un tableau
         if (!portCopy.taggedVlans) {
           portCopy.taggedVlans = [];
+        } else if (!Array.isArray(portCopy.taggedVlans)) {
+          portCopy.taggedVlans = [portCopy.taggedVlans as unknown as string];
         }
+        
         return portCopy;
       });
+      
+      // Remplacer les ports dans la requête
+      requestData.ports = updatedPorts;
     }
     
     // Envoyer la requête au serveur
@@ -270,29 +297,28 @@ export const updateEquipment = async (
         result.vlans = JSON.parse(result.vlans);
       } catch (e) {
         console.error("Erreur lors du parsing des VLANs dans la réponse:", e);
-        result.vlans = updates.vlans || [];
+        result.vlans = [];
       }
-    }
-    // Si les VLANs sont absents de la réponse mais présents dans la requête
-    else if (!result.vlans && updates.vlans) {
-      result.vlans = updates.vlans;
-      console.log("VLANs ajoutés manuellement au résultat:", updates.vlans);
+    } else if (!result.vlans) {
+      // Si vlans est undefined dans la réponse mais présent dans la requête
+      result.vlans = [];
     }
     
     // Vérifier que les taggedVlans des ports sont correctement parsés
     if (result.ports && Array.isArray(result.ports)) {
       result.ports = result.ports.map(port => {
-        if (port.taggedVlans && typeof port.taggedVlans === 'string') {
+        const portCopy = { ...port };
+        if (portCopy.taggedVlans && typeof portCopy.taggedVlans === 'string') {
           try {
-            port.taggedVlans = JSON.parse(port.taggedVlans);
+            portCopy.taggedVlans = JSON.parse(portCopy.taggedVlans);
           } catch (e) {
-            console.error(`Erreur lors du parsing des taggedVlans pour le port ${port.id}:`, e);
-            port.taggedVlans = [];
+            console.error(`Erreur lors du parsing des taggedVlans pour le port ${portCopy.id}:`, e);
+            portCopy.taggedVlans = [];
           }
-        } else if (!port.taggedVlans) {
-          port.taggedVlans = [];
+        } else if (!portCopy.taggedVlans) {
+          portCopy.taggedVlans = [];
         }
-        return port;
+        return portCopy;
       });
     }
     
@@ -405,19 +431,30 @@ export const removeVirtualMachine = async (
 
 // Mettre à jour un port de switch
 export const updateSwitchPort = async (
-  equipmentId: string,
   portId: string,
   updates: Partial<SwitchPort>
 ): Promise<SwitchPort> => {
   try {
     console.log("Updating switch port:", portId, "with data:", JSON.stringify(updates, null, 2));
     
+    // Clone l'objet pour éviter de modifier l'original
+    const requestData: Partial<SwitchPort> = { ...updates };
+    
+    // S'assurer que taggedVlans est un tableau
+    if (requestData.taggedVlans) {
+      if (!Array.isArray(requestData.taggedVlans)) {
+        requestData.taggedVlans = [requestData.taggedVlans as unknown as string];
+      }
+    } else {
+      requestData.taggedVlans = [];
+    }
+    
     const response = await fetch(`${API_URL}/switch-ports/${portId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(updates),
+      body: JSON.stringify(requestData),
     });
     
     if (!response.ok) {
@@ -449,11 +486,10 @@ export const updateSwitchPort = async (
         result.taggedVlans = JSON.parse(result.taggedVlans);
       } catch (e) {
         console.error(`Erreur lors du parsing des taggedVlans pour le port ${portId}:`, e);
-        result.taggedVlans = updates.taggedVlans || [];
+        result.taggedVlans = [];
       }
-    } else if (!result.taggedVlans && updates.taggedVlans) {
-      result.taggedVlans = updates.taggedVlans;
-      console.log("taggedVlans ajoutés manuellement au résultat:", updates.taggedVlans);
+    } else if (!result.taggedVlans) {
+      result.taggedVlans = [];
     }
     
     return result;

@@ -180,11 +180,11 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
                   <div className="space-y-3">
                     <div>
                       <div className="text-xs text-muted-foreground">Adresse IP</div>
-                      <div className="font-mono text-sm">{equipment.ipAddress}</div>
+                      <div className="font-mono text-sm">{equipment.ipAddress || "-"}</div>
                     </div>
                     <div>
                       <div className="text-xs text-muted-foreground">Nombre de Ports</div>
-                      <div>{equipment.portCount} ports</div>
+                      <div>{equipment.portCount || 0} ports</div>
                     </div>
                   </div>
                 </CardContent>
@@ -199,7 +199,7 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {vlans.length > 0 ? (
+                    {vlans && vlans.length > 0 ? (
                       vlans.map((vlan, index) => (
                         <Badge key={index} variant="outline" className="bg-secondary">
                           {vlan}
@@ -269,11 +269,11 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
                   <div className="space-y-3">
                     <div>
                       <div className="text-xs text-muted-foreground">IP iDRAC</div>
-                      <div className="font-mono text-sm">{equipment.idracIp}</div>
+                      <div className="font-mono text-sm">{equipment.idracIp || "-"}</div>
                     </div>
                     <div>
                       <div className="text-xs text-muted-foreground">Description</div>
-                      <div className="text-sm">{equipment.description}</div>
+                      <div className="text-sm">{equipment.description || "-"}</div>
                     </div>
                   </div>
                 </CardContent>

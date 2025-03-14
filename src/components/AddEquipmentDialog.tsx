@@ -108,26 +108,38 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     try {
       const equipment: Omit<Equipment, 'id'> = {
         name,
-        type: type, // Fix: Use the synchronized type state
+        type: type,
         brand,
         position: positionNum,
         size: sizeNum,
       };
       
-      // Fix: Properly check type state when adding equipment-specific fields
+      // Traitement spécifique au type d'équipement
       if (type === 'switch') {
         equipment.portCount = portCount ? parseInt(portCount) : undefined;
-        equipment.ipAddress = ipAddress;
-        equipment.vlans = vlans.split(',').map(vlan => vlan.trim()).filter(vlan => vlan);
+        equipment.ipAddress = ipAddress || undefined;
+        
+        // Traitement des VLANs - s'assurer qu'ils sont correctement formatés
+        const vlansArray = vlans
+          .split(',')
+          .map(vlan => vlan.trim())
+          .filter(vlan => vlan.length > 0);
+        
+        equipment.vlans = vlansArray.length > 0 ? vlansArray : [];
         equipment.ports = []; // Initialize empty ports array
+        
+        console.log("VLANs préparés:", equipment.vlans);
       } else {
-        equipment.idracIp = idracIp;
-        equipment.description = description;
+        equipment.idracIp = idracIp || undefined;
+        equipment.description = description || undefined;
       }
       
-      console.log("Adding equipment:", equipment); // Debug log
+      console.log("Adding equipment:", JSON.stringify(equipment, null, 2));
       
       const result = await addEquipment(rack.id, equipment);
+      
+      console.log("Equipment added result:", JSON.stringify(result, null, 2));
+      console.log("VLANs in result:", result.vlans);
       
       toast.success(`${type === 'switch' ? 'Switch' : 'Serveur'} ajouté avec succès`);
       onOpenChange(false);
@@ -156,7 +168,7 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ajouter Nouvel Équipement</DialogTitle>
           <DialogDescription>
@@ -291,11 +303,13 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             </TabsContent>
           </Tabs>
           
-          <DialogFooter className="mt-6">
+          <DialogFooter className="mt-6 pb-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Annuler
             </Button>
-            <Button type="submit">Ajouter Équipement</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Ajout en cours...' : 'Ajouter Équipement'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

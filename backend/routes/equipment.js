@@ -22,6 +22,7 @@ router.post('/:rackId', async (req, res) => {
     } = req.body;
     
     console.log("Creating equipment with request:", req.body);
+    console.log("VLANS received:", vlans);
     
     // Vérifier si la baie existe
     const [rack] = await db.query('SELECT * FROM racks WHERE id = ?', [rackId]);
@@ -48,7 +49,13 @@ router.post('/:rackId', async (req, res) => {
     }
     
     // Préparer les VLANs si présents
-    const vlansJson = vlans ? JSON.stringify(vlans) : null;
+    let vlansJson = null;
+    if (vlans) {
+      // Assurez-vous que vlans est un tableau
+      const vlansArray = Array.isArray(vlans) ? vlans : [vlans];
+      vlansJson = JSON.stringify(vlansArray);
+      console.log("VLANs to store:", vlansJson);
+    }
     
     // Ajouter l'équipement
     const id = uuidv4();
@@ -91,6 +98,9 @@ router.post('/:rackId', async (req, res) => {
         taggedVlans: JSON.parse(port.taggedVlans || '[]')
       }));
     }
+    
+    console.log("Equipment created successfully:", newEquipment);
+    console.log("VLANs in response:", newEquipment.vlans);
     
     res.status(201).json(newEquipment);
   } catch (error) {
@@ -151,24 +161,74 @@ router.put('/:id', async (req, res) => {
     }
     
     // Préparer les VLANs si présents
-    const vlansJson = vlans ? JSON.stringify(vlans) : equipment.vlans;
+    let vlansJson = equipment.vlans;
+    if (vlans !== undefined) {
+      // Assurez-vous que vlans est un tableau
+      const vlansArray = Array.isArray(vlans) ? vlans : (vlans ? [vlans] : []);
+      vlansJson = JSON.stringify(vlansArray);
+      console.log("Update VLANs to:", vlansJson);
+    }
     
     // Mettre à jour l'équipement
     await db.query(
       'UPDATE equipment SET name = ?, brand = ?, position = ?, size = ?, portCount = ?, ipAddress = ?, idracIp = ?, description = ?, vlans = ? WHERE id = ?',
       [
-        name || equipment.name, 
-        brand || equipment.brand, 
-        position || equipment.position, 
-        size || equipment.size, 
-        portCount || equipment.portCount, 
-        ipAddress || equipment.ipAddress, 
-        idracIp || equipment.idracIp, 
-        description || equipment.description,
+        name ?? equipment.name, 
+        brand ?? equipment.brand, 
+        position ?? equipment.position, 
+        size ?? equipment.size, 
+        portCount ?? equipment.portCount, 
+        ipAddress ?? equipment.ipAddress, 
+        idracIp ?? equipment.idracIp, 
+        description ?? equipment.description,
         vlansJson,
         id
       ]
     );
+    
+    // Si c'est un switch et que des ports temporaires sont fournis, les créer ou les mettre à jour
+    if (equipment.type === 'switch' && ports && ports.length > 0 && ports[0].id.startsWith('temp-port')) {
+      // Supprimer tous les ports existants
+      await db.query('DELETE FROM switch_ports WHERE equipment_id = ?', [id]);
+      
+      // Créer les nouveaux ports
+      const newPortsPromises = ports.map(port => {
+        const portId = uuidv4();
+        const taggedVlansJson = JSON.stringify(port.taggedVlans || []);
+        return db.query(
+          'INSERT INTO switch_ports (id, equipment_id, portNumber, description, connected, taggedVlans, isFibre) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            portId, 
+            id, 
+            port.portNumber, 
+            port.description || '', 
+            port.connected ? 1 : 0, 
+            taggedVlansJson,
+            port.isFibre ? 1 : 0
+          ]
+        );
+      });
+      
+      await Promise.all(newPortsPromises);
+    } 
+    // Sinon, si des ports sont fournis (mise à jour), mettre à jour les ports existants
+    else if (equipment.type === 'switch' && ports && Array.isArray(ports)) {
+      for (const port of ports) {
+        if (port.id && !port.id.startsWith('temp-port')) {
+          const taggedVlansJson = JSON.stringify(port.taggedVlans || []);
+          await db.query(
+            'UPDATE switch_ports SET description = ?, connected = ?, taggedVlans = ?, isFibre = ? WHERE id = ?',
+            [
+              port.description || '', 
+              port.connected ? 1 : 0, 
+              taggedVlansJson,
+              port.isFibre ? 1 : 0,
+              port.id
+            ]
+          );
+        }
+      }
+    }
     
     // Récupérer l'équipement mis à jour
     const [updatedEquipment] = await db.query('SELECT * FROM equipment WHERE id = ?', [id]);
@@ -182,65 +242,14 @@ router.put('/:id', async (req, res) => {
         console.error("Error parsing VLANs:", e);
       }
     } else {
-      updatedEquipment.vlans = vlans || [];
+      updatedEquipment.vlans = [];
     }
     
     // Si c'est un switch, récupérer ses ports
     if (updatedEquipment.type === 'switch') {
-      // Si le nombre de ports a changé ou si c'est une initialisation de ports
-      if ((portCount && portCount !== equipment.portCount) || (ports && ports.length > 0 && ports[0].id.startsWith('temp-port'))) {
-        // Supprimer tous les ports existants
-        await db.query('DELETE FROM switch_ports WHERE equipment_id = ?', [id]);
-        
-        // Créer de nouveaux ports
-        const count = portCount || equipment.portCount || 0;
-        const portsPromises = Array.from({ length: count }, (_, i) => {
-          const portId = uuidv4();
-          const portNumber = i + 1;
-          
-          // Trouver le port correspondant dans la requête (s'il existe)
-          const requestPort = ports && Array.isArray(ports) 
-            ? ports.find(p => p.portNumber === portNumber)
-            : null;
-          
-          // Utiliser les données du port de la requête si disponibles
-          const description = requestPort?.description || '';
-          const connected = requestPort?.connected ? 1 : 0;
-          const taggedVlans = requestPort?.taggedVlans 
-            ? JSON.stringify(requestPort.taggedVlans) 
-            : JSON.stringify([]);
-          const isFibre = requestPort?.isFibre ? 1 : 0;
-          
-          return db.query(
-            'INSERT INTO switch_ports (id, equipment_id, portNumber, description, connected, taggedVlans, isFibre) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [portId, id, portNumber, description, connected, taggedVlans, isFibre]
-          );
-        });
-        
-        await Promise.all(portsPromises);
-      }
-      // Sinon, si des ports sont fournis (mise à jour), mettre à jour les ports existants
-      else if (ports && Array.isArray(ports)) {
-        for (const port of ports) {
-          if (port.id && !port.id.startsWith('temp-port')) {
-            const taggedVlansJson = JSON.stringify(port.taggedVlans || []);
-            await db.query(
-              'UPDATE switch_ports SET description = ?, connected = ?, taggedVlans = ?, isFibre = ? WHERE id = ?',
-              [
-                port.description || '', 
-                port.connected ? 1 : 0, 
-                taggedVlansJson,
-                port.isFibre ? 1 : 0,
-                port.id
-              ]
-            );
-          }
-        }
-      }
-      
       // Récupérer les ports
-      const ports = await db.query('SELECT * FROM switch_ports WHERE equipment_id = ?', [id]);
-      updatedEquipment.ports = ports.map(port => ({
+      const updatedPorts = await db.query('SELECT * FROM switch_ports WHERE equipment_id = ?', [id]);
+      updatedEquipment.ports = updatedPorts.map(port => ({
         ...port,
         taggedVlans: JSON.parse(port.taggedVlans || '[]')
       }));
@@ -251,6 +260,8 @@ router.put('/:id', async (req, res) => {
     }
     
     console.log("Update equipment response:", JSON.stringify(updatedEquipment, null, 2));
+    console.log("VLANs in update response:", updatedEquipment.vlans);
+    
     res.json(updatedEquipment);
   } catch (error) {
     console.error("Equipment update error:", error);
