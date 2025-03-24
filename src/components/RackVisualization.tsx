@@ -52,140 +52,97 @@ const RackVisualization: React.FC<RackVisualizationProps> = ({
     toast.success("Équipement supprimé avec succès");
   };
 
-  // Construire la visualisation des unités de la baie avec des équipements unifiés
-  const renderUnifiedRackUnits = () => {
-    const rackUnitsMap = new Map<number, { unitNumber: number, equipment: Equipment | null }>();
+  // Rendu des unités de rack avec équipements
+  const renderRackUnits = () => {
+    // Créer un tableau pour représenter chaque unité dans le rack
+    const rackUnits = [];
     
     // Initialiser toutes les unités comme vides
-    for (let i = 1; i <= rack.totalUnits; i++) {
-      rackUnitsMap.set(i, { unitNumber: i, equipment: null });
-    }
-    
-    // Marquer les unités occupées par des équipements
-    rack.equipment.forEach(equipment => {
-      const start = equipment.position;
-      const end = start + equipment.size - 1;
-      
-      for (let i = start; i <= end; i++) {
-        if (rackUnitsMap.has(i)) {
-          rackUnitsMap.set(i, { unitNumber: i, equipment });
-        }
-      }
-    });
-    
-    // Convertir la map en tableau trié par numéro d'unité (décroissant)
-    const sortedUnits = Array.from(rackUnitsMap.values())
-      .sort((a, b) => b.unitNumber - a.unitNumber);
-    
-    // Créer des segments unifiés pour l'affichage
-    const unifiedSegments: JSX.Element[] = [];
-    let currentEquipment: Equipment | null = null;
-    let segmentStart = 0;
-    
-    sortedUnits.forEach((unit, index) => {
-      // Si on commence un nouveau segment ou on change d'équipement
-      if (unit.equipment !== currentEquipment) {
-        // Si on avait un équipement avant, on finalise le segment précédent
-        if (currentEquipment && segmentStart < index) {
-          unifiedSegments.push(renderEquipmentSegment(currentEquipment, sortedUnits.slice(segmentStart, index)));
-        }
-        
-        // On démarre un nouveau segment
-        currentEquipment = unit.equipment;
-        segmentStart = index;
-      }
-      
-      // Pour le dernier élément, on finalise le segment en cours
-      if (index === sortedUnits.length - 1) {
-        unifiedSegments.push(
-          currentEquipment 
-            ? renderEquipmentSegment(currentEquipment, sortedUnits.slice(segmentStart, index + 1))
-            : renderEmptyUnit(unit.unitNumber)
-        );
-      }
-    });
-    
-    return unifiedSegments;
-  };
-  
-  // Rendu d'un segment unifié pour un équipement
-  const renderEquipmentSegment = (equipment: Equipment, units: { unitNumber: number, equipment: Equipment | null }[]) => {
-    // S'il n'y a pas d'équipement ou d'unités, on ne rend rien
-    if (!equipment || units.length === 0) return null;
-    
-    const firstUnit = units[0];
-    const lastUnit = units[units.length - 1];
-    const equipmentHeight = units.length * 48; // 48px par unité
-    const isFirstUnit = equipment.position === firstUnit.unitNumber;
-    
-    // Si ce n'est pas la première unité de l'équipement, on affiche juste le numéro d'unité
-    if (!isFirstUnit) {
-      return (
-        <div key={`unit-${firstUnit.unitNumber}-${lastUnit.unitNumber}`} className="rack-label-only">
-          {units.map(unit => (
-            <div key={`label-${unit.unitNumber}`} className="rack-label h-12">{unit.unitNumber}</div>
-          ))}
+    for (let i = rack.totalUnits; i >= 1; i--) {
+      let unitContent = (
+        <div key={`empty-${i}`} className="rack-unit group h-12">
+          <div className="rack-label">{i}</div>
+          <div className="h-full ml-10 flex items-center px-3">
+            <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+              Vide
+            </span>
+          </div>
         </div>
       );
+      
+      // Vérifier si cette unité est occupée par un équipement
+      const occupyingEquipment = rack.equipment.find(eq => {
+        const startPos = eq.position;
+        const endPos = startPos + eq.size - 1;
+        return i >= startPos && i <= endPos;
+      });
+      
+      if (occupyingEquipment) {
+        // Si c'est la première unité de l'équipement, afficher l'équipement complet
+        if (i === occupyingEquipment.position) {
+          const equipmentHeight = occupyingEquipment.size * 48; // 48px par unité
+          const equipmentClass = occupyingEquipment.type === 'switch' ? 'switch-equipment' : 'server-equipment';
+          
+          unitContent = (
+            <div 
+              key={`equipment-${occupyingEquipment.id}-${i}`}
+              className={`rack-unit-occupied ${equipmentClass} border-b cursor-pointer ${
+                selectedEquipment?.id === occupyingEquipment.id ? 'ring-2 ring-primary' : ''
+              }`}
+              style={{ height: `${equipmentHeight}px` }}
+              onClick={() => handleEquipmentClick(occupyingEquipment)}
+            >
+              {/* Labels pour chaque unité */}
+              <div className="rack-labels">
+                {Array.from({ length: occupyingEquipment.size }, (_, index) => {
+                  const unitNumber = occupyingEquipment.position + index;
+                  return (
+                    <div key={`label-${unitNumber}`} className="rack-label h-12">{unitNumber}</div>
+                  );
+                })}
+              </div>
+              
+              <div className="ml-10 p-3 h-full flex flex-col">
+                <div className="flex items-center gap-2">
+                  {occupyingEquipment.type === 'switch' ? (
+                    <Cpu className="h-4 w-4" />
+                  ) : (
+                    <Server className="h-4 w-4" />
+                  )}
+                  <span className="font-medium text-sm">{occupyingEquipment.name}</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {occupyingEquipment.brand} - {getPositionString(occupyingEquipment)}
+                </div>
+                
+                {occupyingEquipment.type === 'switch' && (
+                  <div className="text-xs mt-1">
+                    <span className="text-muted-foreground">Ports:</span> {occupyingEquipment.portCount}
+                  </div>
+                )}
+                
+                {occupyingEquipment.type === 'server' && occupyingEquipment.virtualMachines && (
+                  <div className="text-xs mt-1">
+                    <span className="text-muted-foreground">VMs:</span> {occupyingEquipment.virtualMachines.length}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+          
+          // Skip the next n-1 units that are also part of this equipment
+          i -= (occupyingEquipment.size - 1);
+        } else {
+          // Pour les autres unités de l'équipement, ne rien afficher
+          continue;
+        }
+      }
+      
+      rackUnits.push(unitContent);
     }
     
-    // Si c'est la première unité, on affiche l'équipement complet
-    const equipmentClass = equipment.type === 'switch' ? 'switch-equipment' : 'server-equipment';
-    
-    return (
-      <div 
-        key={`equipment-${equipment.id}`}
-        className={`rack-unit-occupied ${equipmentClass} border-b cursor-pointer ${
-          selectedEquipment?.id === equipment.id ? 'ring-2 ring-primary' : ''
-        }`}
-        style={{ height: `${equipmentHeight}px` }}
-        onClick={() => handleEquipmentClick(equipment)}
-      >
-        <div className="rack-labels">
-          {units.map(unit => (
-            <div key={`label-${unit.unitNumber}`} className="rack-label h-12">{unit.unitNumber}</div>
-          ))}
-        </div>
-        <div className="ml-10 p-3 h-full flex flex-col">
-          <div className="flex items-center gap-2">
-            {equipment.type === 'switch' ? (
-              <Cpu className="h-4 w-4" />
-            ) : (
-              <Server className="h-4 w-4" />
-            )}
-            <span className="font-medium text-sm">{equipment.name}</span>
-          </div>
-          <div className="text-xs text-muted-foreground mt-1">
-            {equipment.brand} - {getPositionString(equipment)}
-          </div>
-          
-          {equipment.type === 'switch' && (
-            <div className="text-xs mt-1">
-              <span className="text-muted-foreground">Ports:</span> {equipment.portCount}
-            </div>
-          )}
-          
-          {equipment.type === 'server' && equipment.virtualMachines && (
-            <div className="text-xs mt-1">
-              <span className="text-muted-foreground">VMs:</span> {equipment.virtualMachines.length}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return rackUnits;
   };
-  
-  // Rendu d'une unité vide
-  const renderEmptyUnit = (unitNumber: number) => (
-    <div key={`unit-${unitNumber}`} className="rack-unit group h-12">
-      <div className="rack-label">{unitNumber}</div>
-      <div className="h-full ml-10 flex items-center px-3">
-        <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-          Vide
-        </span>
-      </div>
-    </div>
-  );
   
   return (
     <div className="flex flex-col lg:flex-row gap-6 animate-fade-in">
@@ -202,7 +159,7 @@ const RackVisualization: React.FC<RackVisualizationProps> = ({
             <div className="w-full max-w-sm">
               <ScrollArea className="h-[600px] rounded border">
                 <div className="flex flex-col">
-                  {renderUnifiedRackUnits()}
+                  {renderRackUnits()}
                 </div>
               </ScrollArea>
             </div>
