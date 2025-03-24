@@ -60,8 +60,24 @@ router.get('/:id', async (req, res) => {
         
         result.ports = portsWithParsedVlans;
         
-        const vlans = await db.query('SELECT * FROM vlans WHERE equipment_id = ?', [eq.id]);
-        result.vlans = vlans.map(vlan => vlan.name);
+        // Traitement des VLANs directement depuis l'équipement
+        if (result.vlans) {
+          try {
+            console.log(`VLANs bruts pour ${result.id}:`, result.vlans);
+            result.vlans = JSON.parse(result.vlans);
+            console.log(`VLANs parsés pour ${result.id}:`, result.vlans);
+            
+            // S'assurer que c'est bien un tableau
+            if (!Array.isArray(result.vlans)) {
+              result.vlans = [result.vlans];
+            }
+          } catch (e) {
+            console.error(`Erreur lors du parsing des VLANs pour l'équipement ${result.id}:`, e);
+            result.vlans = [];
+          }
+        } else {
+          result.vlans = [];
+        }
       }
       
       return result;

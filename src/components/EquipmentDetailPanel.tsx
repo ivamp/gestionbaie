@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Equipment, VirtualMachine, SwitchPort } from '@/types/rack';
 import { 
@@ -124,13 +125,30 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
     console.log("EquipmentDetailPanel - equipment:", equipment);
     if (equipment.type === 'switch') {
       console.log("VLANs disponibles:", equipment.vlans);
+      console.log("VLANs type:", typeof equipment.vlans);
       console.log("Ports:", equipment.ports);
     }
   }, [equipment]);
 
   // S'assurer que vlans est toujours un array
-  const vlans = Array.isArray(equipment.vlans) ? equipment.vlans : 
-               equipment.vlans ? [equipment.vlans] : [];
+  let vlans: string[] = [];
+  
+  if (Array.isArray(equipment.vlans)) {
+    vlans = equipment.vlans.filter(vlan => vlan !== null && vlan !== undefined && vlan !== '');
+    console.log("VLANs filtrés après vérification array:", vlans);
+  } else if (equipment.vlans && typeof equipment.vlans === 'string') {
+    try {
+      const parsed = JSON.parse(equipment.vlans);
+      vlans = Array.isArray(parsed) ? parsed : [parsed];
+      console.log("VLANs parsés depuis string:", vlans);
+    } catch (e) {
+      vlans = equipment.vlans ? [equipment.vlans] : [];
+      console.log("VLANs utilisés comme string simple:", vlans);
+    }
+  } else if (equipment.vlans) {
+    vlans = [String(equipment.vlans)];
+    console.log("VLANs convertis en string:", vlans);
+  }
 
   return (
     <div className="space-y-6 animate-slide-up">
@@ -198,7 +216,7 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {vlans && vlans.length > 0 ? (
+                    {vlans.length > 0 ? (
                       vlans.map((vlan, index) => (
                         <Badge key={index} variant="outline" className="bg-secondary">
                           {vlan}

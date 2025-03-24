@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -12,16 +11,19 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Routes
-const racksRouter = require('./routes/racks');
-const equipmentRouter = require('./routes/equipment');
-const virtualMachinesRouter = require('./routes/virtualMachines');
-const switchPortsRouter = require('./routes/switchPorts');
+// Importation des routes
+const racksRoutes = require('./routes/racks');
+const equipmentRoutes = require('./routes/equipment');
+const virtualMachinesRoutes = require('./routes/virtualMachines');
+const switchPortsRoutes = require('./routes/switchPorts');
+const debugRoutes = require('./routes/debug');
 
-app.use('/api/racks', racksRouter);
-app.use('/api/equipment', equipmentRouter);
-app.use('/api/virtual-machines', virtualMachinesRouter);
-app.use('/api/switch-ports', switchPortsRouter);
+// Routes de l'API
+app.use('/api/racks', racksRoutes);
+app.use('/api/equipment', equipmentRoutes);
+app.use('/api/virtual-machines', virtualMachinesRoutes);
+app.use('/api/switch-ports', switchPortsRoutes);
+app.use('/api/debug', debugRoutes); // Ajout des routes de débogage
 
 // Route de test
 app.get('/api/test', (req, res) => {

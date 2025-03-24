@@ -3,6 +3,30 @@ import { Equipment, Rack, RackSummary, VirtualMachine, SwitchPort } from '../typ
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 /**
+ * Fonction utilitaire pour garantir que les VLANs sont toujours un tableau
+ */
+const ensureVlansArray = (vlans: any): string[] => {
+  if (!vlans) {
+    return [];
+  }
+  
+  if (Array.isArray(vlans)) {
+    return vlans.filter(v => v != null && v !== '');
+  }
+  
+  if (typeof vlans === 'string') {
+    try {
+      const parsed = JSON.parse(vlans);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      return vlans ? [vlans] : [];
+    }
+  }
+  
+  return [String(vlans)];
+};
+
+/**
  * Fonctions qui font des appels API vers le backend
  */
 
@@ -39,36 +63,14 @@ export const getRack = async (id: string): Promise<Rack | undefined> => {
           // Débugging pour voir la valeur brute des VLANs reçus
           console.log(`VLANs reçus pour l'équipement ${eq.id}:`, eq.vlans);
           
-          // Vérifier si vlans est une string, dans ce cas la parser
-          if (eq.vlans && typeof eq.vlans === 'string') {
-            try {
-              eq.vlans = JSON.parse(eq.vlans);
-              console.log(`VLANs parsés pour l'équipement ${eq.id}:`, eq.vlans);
-            } catch (e) {
-              console.error(`Erreur lors du parsing des VLANs pour l'équipement ${eq.id}:`, e);
-              eq.vlans = [];
-            }
-          } else if (!eq.vlans) {
-            // Si vlans est null ou undefined, initialiser un tableau vide
-            eq.vlans = [];
-          } else if (Array.isArray(eq.vlans)) {
-            // Si c'est déjà un array, s'assurer qu'il n'y a pas d'éléments null ou undefined
-            eq.vlans = eq.vlans.filter(vlan => vlan !== null && vlan !== undefined);
-          }
+          // Utiliser notre fonction utilitaire
+          eq.vlans = ensureVlansArray(eq.vlans);
+          console.log(`VLANs normalisés pour l'équipement ${eq.id}:`, eq.vlans);
           
           // Vérifier que les ports ont des taggedVlans corrects
           if (eq.ports && Array.isArray(eq.ports)) {
             eq.ports = eq.ports.map(port => {
-              if (port.taggedVlans && typeof port.taggedVlans === 'string') {
-                try {
-                  port.taggedVlans = JSON.parse(port.taggedVlans);
-                } catch (e) {
-                  console.error(`Erreur lors du parsing des taggedVlans pour le port ${port.id}:`, e);
-                  port.taggedVlans = [];
-                }
-              } else if (!port.taggedVlans) {
-                port.taggedVlans = [];
-              }
+              port.taggedVlans = ensureVlansArray(port.taggedVlans);
               return port;
             });
           }
@@ -151,18 +153,12 @@ export const addEquipment = async (
   equipment: Omit<Equipment, 'id'>
 ): Promise<Equipment> => {
   try {
-    // Assurons-nous que les VLANs sont inclus dans la requête s'il s'agit d'un switch
-    if (equipment.type === 'switch' && equipment.vlans) {
-      console.log("Ajout d'équipement avec VLANs:", equipment.vlans);
-    }
-    
     // Clone l'objet pour éviter de modifier l'original
     const requestData = { ...equipment };
     
     // S'assurer que vlans est bien un tableau et non pas undefined
     if (equipment.type === 'switch') {
-      requestData.vlans = Array.isArray(requestData.vlans) ? requestData.vlans : 
-                          requestData.vlans ? [requestData.vlans] : [];
+      requestData.vlans = ensureVlansArray(requestData.vlans);
     }
     
     // Debug log for the request
@@ -180,11 +176,9 @@ export const addEquipment = async (
       const errorText = await response.text();
       let errorMessage;
       try {
-        // Essayer de parser le message d'erreur en JSON
         const errorData = JSON.parse(errorText);
         errorMessage = errorData.error || `Erreur HTTP: ${response.status}`;
       } catch (e) {
-        // Si le parsing échoue, utiliser le texte brut
         errorMessage = `Erreur HTTP: ${response.status} - ${errorText.substring(0, 100)}...`;
       }
       throw new Error(errorMessage);
@@ -193,34 +187,16 @@ export const addEquipment = async (
     const result = await response.json();
     console.log("Add equipment response:", JSON.stringify(result, null, 2));
     
-    // Si vlans est une string JSON dans la réponse, parser
-    if (result.vlans && typeof result.vlans === 'string') {
-      try {
-        result.vlans = JSON.parse(result.vlans);
-      } catch (e) {
-        console.error("Erreur lors du parsing des VLANs dans la réponse:", e);
-        result.vlans = [];
-      }
-    } else if (!result.vlans) {
-      // Si vlans est undefined dans la réponse, initialiser un tableau vide
-      result.vlans = [];
+    // Utiliser notre fonction utilitaire pour normaliser les VLANs
+    if (result.type === 'switch') {
+      result.vlans = ensureVlansArray(result.vlans);
     }
     
     // S'assurer que les ports ont des taggedVlans correctement parsés
     if (result.ports && Array.isArray(result.ports)) {
       result.ports = result.ports.map(port => {
-        const portCopy = { ...port };
-        if (portCopy.taggedVlans && typeof portCopy.taggedVlans === 'string') {
-          try {
-            portCopy.taggedVlans = JSON.parse(portCopy.taggedVlans);
-          } catch (e) {
-            console.error(`Erreur lors du parsing des taggedVlans pour le port ${portCopy.id}:`, e);
-            portCopy.taggedVlans = [];
-          }
-        } else if (!portCopy.taggedVlans) {
-          portCopy.taggedVlans = [];
-        }
-        return portCopy;
+        port.taggedVlans = ensureVlansArray(port.taggedVlans);
+        return port;
       });
     }
     
@@ -245,8 +221,7 @@ export const updateEquipment = async (
     
     // S'assurer que vlans est un tableau si présent
     if (requestData.vlans !== undefined) {
-      requestData.vlans = Array.isArray(requestData.vlans) ? requestData.vlans : 
-                          requestData.vlans ? [requestData.vlans] : [];
+      requestData.vlans = ensureVlansArray(requestData.vlans);
     }
     
     // Préparer les ports avant d'envoyer la requête
@@ -256,11 +231,7 @@ export const updateEquipment = async (
         const portCopy = { ...port };
         
         // S'assurer que taggedVlans est un tableau
-        if (!portCopy.taggedVlans) {
-          portCopy.taggedVlans = [];
-        } else if (!Array.isArray(portCopy.taggedVlans)) {
-          portCopy.taggedVlans = [portCopy.taggedVlans as unknown as string];
-        }
+        portCopy.taggedVlans = ensureVlansArray(portCopy.taggedVlans);
         
         return portCopy;
       });
@@ -269,7 +240,6 @@ export const updateEquipment = async (
       requestData.ports = updatedPorts;
     }
     
-    // Envoyer la requête au serveur
     const response = await fetch(`${API_URL}/equipment/${equipmentId}`, {
       method: 'PUT',
       headers: {
@@ -279,7 +249,6 @@ export const updateEquipment = async (
     });
     
     if (!response.ok) {
-      // Improved error handling
       let errorMessage = `Erreur HTTP: ${response.status}`;
       try {
         const errorResponse = await response.json();
@@ -287,14 +256,12 @@ export const updateEquipment = async (
           errorMessage = errorResponse.error;
         }
       } catch (e) {
-        // If the response is not JSON, try to get text
         try {
           const errorText = await response.text();
           if (errorText) {
             errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}...`;
           }
         } catch (textError) {
-          // Fallback if we can't get text either
           console.error("Failed to parse error response:", textError);
         }
       }
@@ -304,34 +271,16 @@ export const updateEquipment = async (
     const result = await response.json();
     console.log("Update equipment response:", JSON.stringify(result, null, 2));
     
-    // Si les VLANs sont mis à jour, mais sont une string JSON dans la réponse, parsons-les
-    if (result.vlans && typeof result.vlans === 'string') {
-      try {
-        result.vlans = JSON.parse(result.vlans);
-      } catch (e) {
-        console.error("Erreur lors du parsing des VLANs dans la réponse:", e);
-        result.vlans = [];
-      }
-    } else if (!result.vlans) {
-      // Si vlans est undefined dans la réponse mais présent dans la requête
-      result.vlans = [];
+    // Utiliser notre fonction utilitaire pour normaliser les VLANs dans la réponse
+    if (result.type === 'switch') {
+      result.vlans = ensureVlansArray(result.vlans);
     }
     
     // Vérifier que les taggedVlans des ports sont correctement parsés
     if (result.ports && Array.isArray(result.ports)) {
       result.ports = result.ports.map(port => {
-        const portCopy = { ...port };
-        if (portCopy.taggedVlans && typeof portCopy.taggedVlans === 'string') {
-          try {
-            portCopy.taggedVlans = JSON.parse(portCopy.taggedVlans);
-          } catch (e) {
-            console.error(`Erreur lors du parsing des taggedVlans pour le port ${portCopy.id}:`, e);
-            portCopy.taggedVlans = [];
-          }
-        } else if (!portCopy.taggedVlans) {
-          portCopy.taggedVlans = [];
-        }
-        return portCopy;
+        port.taggedVlans = ensureVlansArray(port.taggedVlans);
+        return port;
       });
     }
     
@@ -511,3 +460,32 @@ export const updateSwitchPort = async (
     throw error;
   }
 };
+
+// Obtenir les données de debug pour un équipement
+export const getEquipmentDebugData = async (equipmentId: string) => {
+  try {
+    const response = await fetch(`${API_URL}/debug/equipment/${equipmentId}`);
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Erreur lors de la récupération des données de debug pour l'équipement ${equipmentId}:`, error);
+    throw error;
+  }
+};
+
+// Obtenir les données de debug pour les VLANs d'un équipement
+export const getVlansDebugData = async (equipmentId: string) => {
+  try {
+    const response = await fetch(`${API_URL}/debug/vlans/${equipmentId}`);
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Erreur lors de la récupération des données de debug VLAN pour l'équipement ${equipmentId}:`, error);
+    throw error;
+  }
+};
+
