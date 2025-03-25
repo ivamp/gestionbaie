@@ -12,15 +12,18 @@ CREATE TABLE IF NOT EXISTS equipment (
   id VARCHAR(36) PRIMARY KEY,
   rack_id VARCHAR(36) NOT NULL,
   name VARCHAR(100) NOT NULL,
-  type ENUM('switch', 'server') NOT NULL,
+  type ENUM('switch', 'server', 'accessory', 'ups') NOT NULL,
   brand VARCHAR(100) NOT NULL,
   position INT NOT NULL,
   size INT NOT NULL,
   portCount INT,
+  sfpPortCount INT,
   ipAddress VARCHAR(15),
   idracIp VARCHAR(15),
   description TEXT,
   vlans JSON,
+  model VARCHAR(100),
+  power VARCHAR(50),
   FOREIGN KEY (rack_id) REFERENCES racks(id) ON DELETE CASCADE
 );
 
@@ -44,6 +47,7 @@ CREATE TABLE IF NOT EXISTS switch_ports (
   connected BOOLEAN NOT NULL DEFAULT false,
   taggedVlans JSON,
   isFibre BOOLEAN NOT NULL DEFAULT false,
+  isSFP BOOLEAN NOT NULL DEFAULT false,
   FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
 

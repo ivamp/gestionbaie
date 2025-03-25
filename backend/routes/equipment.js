@@ -1,3 +1,4 @@
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -13,11 +14,14 @@ router.post('/:rackId', async (req, res) => {
       brand, 
       position, 
       size, 
-      portCount, 
+      portCount,
+      sfpPortCount,
       ipAddress, 
       idracIp, 
       description,
-      vlans
+      vlans,
+      model,
+      power
     } = req.body;
     
     console.log("Creating equipment with request:", req.body);
@@ -59,8 +63,8 @@ router.post('/:rackId', async (req, res) => {
     // Ajouter l'équipement
     const id = uuidv4();
     await db.query(
-      'INSERT INTO equipment (id, rack_id, name, type, brand, position, size, portCount, ipAddress, idracIp, description, vlans) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, rackId, name, type, brand, position, size, portCount, ipAddress, idracIp, description, vlansJson]
+      'INSERT INTO equipment (id, rack_id, name, type, brand, position, size, portCount, sfpPortCount, ipAddress, idracIp, description, vlans, model, power) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, rackId, name, type, brand, position, size, portCount, sfpPortCount, ipAddress, idracIp, description, vlansJson, model, power]
     );
     
     // Récupérer l'équipement ajouté
@@ -79,14 +83,35 @@ router.post('/:rackId', async (req, res) => {
     }
     
     // Si c'est un switch et qu'il a des ports, les créer
-    if (type === 'switch' && portCount) {
-      const portsPromises = Array.from({ length: portCount }, (_, i) => {
-        const portId = uuidv4();
-        return db.query(
-          'INSERT INTO switch_ports (id, equipment_id, portNumber, description, connected, taggedVlans, isFibre) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [portId, id, i + 1, '', false, JSON.stringify([]), false]
-        );
-      });
+    if (type === 'switch') {
+      const portsPromises = [];
+      
+      // Créer les ports RJ45 standard
+      if (portCount) {
+        for (let i = 0; i < portCount; i++) {
+          const portId = uuidv4();
+          portsPromises.push(
+            db.query(
+              'INSERT INTO switch_ports (id, equipment_id, portNumber, description, connected, taggedVlans, isFibre, isSFP) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              [portId, id, i + 1, '', false, JSON.stringify([]), false, false]
+            )
+          );
+        }
+      }
+      
+      // Créer les ports SFP
+      if (sfpPortCount) {
+        for (let i = 0; i < sfpPortCount; i++) {
+          const portId = uuidv4();
+          const portNumber = (portCount || 0) + i + 1;
+          portsPromises.push(
+            db.query(
+              'INSERT INTO switch_ports (id, equipment_id, portNumber, description, connected, taggedVlans, isFibre, isSFP) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              [portId, id, portNumber, '', false, JSON.stringify([]), true, true]
+            )
+          );
+        }
+      }
       
       await Promise.all(portsPromises);
       
@@ -117,12 +142,15 @@ router.put('/:id', async (req, res) => {
       brand, 
       position, 
       size, 
-      portCount, 
+      portCount,
+      sfpPortCount,
       ipAddress, 
       idracIp, 
       description,
       vlans,
-      ports
+      ports,
+      model,
+      power
     } = req.body;
     
     console.log("Update equipment request:", JSON.stringify(req.body, null, 2));
@@ -168,19 +196,22 @@ router.put('/:id', async (req, res) => {
       console.log("Update VLANs to:", vlansJson);
     }
     
-    // Mettre à jour l'équipement avec les nouveaux VLANs (même s'ils sont vides)
+    // Mettre à jour l'équipement avec les nouveaux champs
     await db.query(
-      'UPDATE equipment SET name = ?, brand = ?, position = ?, size = ?, portCount = ?, ipAddress = ?, idracIp = ?, description = ?, vlans = ? WHERE id = ?',
+      'UPDATE equipment SET name = ?, brand = ?, position = ?, size = ?, portCount = ?, sfpPortCount = ?, ipAddress = ?, idracIp = ?, description = ?, vlans = ?, model = ?, power = ? WHERE id = ?',
       [
         name ?? equipment.name, 
         brand ?? equipment.brand, 
         position ?? equipment.position, 
         size ?? equipment.size, 
-        portCount ?? equipment.portCount, 
+        portCount ?? equipment.portCount,
+        sfpPortCount ?? equipment.sfpPortCount,
         ipAddress ?? equipment.ipAddress, 
         idracIp ?? equipment.idracIp, 
         description ?? equipment.description,
         vlansJson,
+        model ?? equipment.model,
+        power ?? equipment.power,
         id
       ]
     );
@@ -195,7 +226,7 @@ router.put('/:id', async (req, res) => {
         const portId = uuidv4();
         const taggedVlansJson = JSON.stringify(port.taggedVlans || []);
         return db.query(
-          'INSERT INTO switch_ports (id, equipment_id, portNumber, description, connected, taggedVlans, isFibre) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO switch_ports (id, equipment_id, portNumber, description, connected, taggedVlans, isFibre, isSFP) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           [
             portId, 
             id, 
@@ -203,7 +234,8 @@ router.put('/:id', async (req, res) => {
             port.description || '', 
             port.connected ? 1 : 0, 
             taggedVlansJson,
-            port.isFibre ? 1 : 0
+            port.isFibre ? 1 : 0,
+            port.isSFP ? 1 : 0
           ]
         );
       });
@@ -216,12 +248,13 @@ router.put('/:id', async (req, res) => {
         if (port.id && !port.id.startsWith('temp-port')) {
           const taggedVlansJson = JSON.stringify(port.taggedVlans || []);
           await db.query(
-            'UPDATE switch_ports SET description = ?, connected = ?, taggedVlans = ?, isFibre = ? WHERE id = ?',
+            'UPDATE switch_ports SET description = ?, connected = ?, taggedVlans = ?, isFibre = ?, isSFP = ? WHERE id = ?',
             [
               port.description || '', 
               port.connected ? 1 : 0, 
               taggedVlansJson,
               port.isFibre ? 1 : 0,
+              port.isSFP ? 1 : 0,
               port.id
             ]
           );
