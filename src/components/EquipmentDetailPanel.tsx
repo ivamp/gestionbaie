@@ -18,7 +18,9 @@ import {
   LayoutGrid, 
   Layers,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Package,
+  Battery
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -156,7 +158,10 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
         <div>
           <div className="inline-flex items-center gap-1.5">
             <Badge variant="outline" className="bg-primary/5">
-              {equipment.type === 'switch' ? 'Switch Réseau' : 'Serveur'}
+              {equipment.type === 'switch' ? 'Switch Réseau' : 
+               equipment.type === 'server' ? 'Serveur' : 
+               equipment.type === 'accessory' ? 'Accessoire' : 
+               equipment.type === 'ups' ? 'Onduleur' : 'Équipement'}
             </Badge>
             <Badge variant="outline" className="bg-secondary">
               {equipment.size}U
@@ -169,6 +174,12 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
         <div className="flex items-center gap-2">
           {equipment.type === 'switch' ? (
             <Cpu className="h-10 w-10 p-2 bg-blue-500/10 text-blue-500 rounded-lg" />
+          ) : equipment.type === 'server' ? (
+            <Server className="h-10 w-10 p-2 bg-amber-500/10 text-amber-500 rounded-lg" />
+          ) : equipment.type === 'accessory' ? (
+            <Package className="h-10 w-10 p-2 bg-purple-500/10 text-purple-500 rounded-lg" />
+          ) : equipment.type === 'ups' ? (
+            <Battery className="h-10 w-10 p-2 bg-green-500/10 text-green-500 rounded-lg" />
           ) : (
             <Server className="h-10 w-10 p-2 bg-amber-500/10 text-amber-500 rounded-lg" />
           )}
@@ -201,8 +212,14 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
                     </div>
                     <div>
                       <div className="text-xs text-muted-foreground">Nombre de Ports</div>
-                      <div>{equipment.portCount || 0} ports</div>
+                      <div>{equipment.portCount || 0} ports RJ45</div>
                     </div>
+                    {equipment.sfpPortCount && (
+                      <div>
+                        <div className="text-xs text-muted-foreground">Ports SFP</div>
+                        <div>{equipment.sfpPortCount} ports SFP</div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -266,7 +283,7 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
             )}
           </TabsContent>
         </Tabs>
-      ) : (
+      ) : equipment.type === 'server' ? (
         <Tabs defaultValue="overview">
           <TabsList className="grid grid-cols-2 w-full max-w-md">
             <TabsTrigger value="overview">Aperçu</TabsTrigger>
@@ -354,7 +371,112 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
             )}
           </TabsContent>
         </Tabs>
-      )}
+      ) : equipment.type === 'accessory' ? (
+        <div className="mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Détails Accessoire
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Description</div>
+                    <div className="text-sm">{equipment.description || "-"}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Emplacement
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Position</div>
+                    <div>U{equipment.position}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Taille</div>
+                    <div>{equipment.size}U</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : equipment.type === 'ups' ? (
+        <div className="mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Battery className="h-4 w-4" />
+                  Détails Onduleur
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Modèle</div>
+                    <div className="text-sm">{equipment.model || "-"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Puissance</div>
+                    <div className="text-sm">{equipment.power || "-"}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Network className="h-4 w-4" />
+                  Détails Réseau
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Adresse IP</div>
+                    <div className="font-mono text-sm">{equipment.ipAddress || "-"}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Emplacement
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Position</div>
+                    <div>U{equipment.position}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Taille</div>
+                    <div>{equipment.size}U</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
