@@ -63,6 +63,9 @@ const SwitchPortsTable: React.FC<{ ports: SwitchPort[], vlans: string[] | undefi
     console.log("SwitchPortsTable - ports:", ports);
     console.log("SwitchPortsTable - vlans disponibles:", vlans);
   }, [ports, vlans]);
+  
+  // Trier les ports par numéro
+  const sortedPorts = [...ports].sort((a, b) => a.portNumber - b.portNumber);
 
   return (
     <div className="space-y-4">
@@ -75,8 +78,8 @@ const SwitchPortsTable: React.FC<{ ports: SwitchPort[], vlans: string[] | undefi
         </div>
         
         <ScrollArea className="h-[300px]">
-          {ports && ports.length > 0 ? (
-            ports.map((port) => (
+          {sortedPorts && sortedPorts.length > 0 ? (
+            sortedPorts.map((port) => (
               <div 
                 key={port.id} 
                 className="px-4 py-2 text-sm border-t grid grid-cols-12 gap-2 items-center"

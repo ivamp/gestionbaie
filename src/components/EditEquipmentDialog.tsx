@@ -622,7 +622,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                           <div className="col-span-7">VLANs</div>
                         </div>
                         
-                        {ports.map((port) => (
+                        {[...ports].sort((a, b) => a.portNumber - b.portNumber).map((port) => (
                           <div key={port.id} className="grid grid-cols-12 gap-2 items-center border rounded-lg p-3">
                             <div className="col-span-1 font-medium">{port.portNumber}</div>
                             <div className="col-span-3">
