@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Equipment, EquipmentType, Rack } from '@/types/rack';
-import { Server, Cpu } from 'lucide-react';
+import { Server, Cpu, Package, Battery } from 'lucide-react';
 import { toast } from 'sonner';
 import { addEquipment } from '@/services/rackService';
 
@@ -47,12 +47,19 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   // Fix: Update type state when equipmentType changes
   const [type, setType] = useState<EquipmentType>('server');
   
+  // Switch specific
   const [portCount, setPortCount] = useState('');
+  const [sfpPortCount, setSfpPortCount] = useState('');
   const [ipAddress, setIpAddress] = useState('');
   const [vlans, setVlans] = useState('');
   
+  // Server specific
   const [idracIp, setIdracIp] = useState('');
   const [description, setDescription] = useState('');
+  
+  // UPS specific
+  const [model, setModel] = useState('');
+  const [power, setPower] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -66,8 +73,15 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     
     if (isSubmitting) return;
     
-    if (!name || !brand || !position || !size || !type) {
+    // Validation de base
+    if (!name || !position || !size || !type) {
       toast.error("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+    
+    // Validation spécifique au type d'équipement
+    if (type !== 'accessory' && !brand) {
+      toast.error("Veuillez spécifier la marque de l'équipement");
       return;
     }
     
@@ -89,6 +103,7 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       return;
     }
     
+    // Vérification de chevauchement
     for (const eq of rack.equipment) {
       const eqStart = eq.position;
       const eqEnd = eq.position + eq.size - 1;
@@ -109,14 +124,15 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       const equipment: Omit<Equipment, 'id'> = {
         name,
         type: type,
-        brand,
+        brand: type === 'accessory' ? 'N/A' : brand,
         position: positionNum,
         size: sizeNum,
       };
       
       // Traitement spécifique au type d'équipement
       if (type === 'switch') {
-        equipment.portCount = portCount ? parseInt(portCount) : undefined;
+        equipment.portCount = portCount ? parseInt(portCount) : 0;
+        equipment.sfpPortCount = sfpPortCount ? parseInt(sfpPortCount) : 0;
         equipment.ipAddress = ipAddress || undefined;
         
         // Traitement des VLANs - s'assurer qu'ils sont correctement formatés
@@ -127,10 +143,14 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
         
         equipment.vlans = vlansArray.length > 0 ? vlansArray : [];
         equipment.ports = []; // Initialize empty ports array
-        
-        console.log("VLANs préparés:", equipment.vlans);
-      } else {
+      } else if (type === 'server') {
         equipment.idracIp = idracIp || undefined;
+        equipment.description = description || undefined;
+      } else if (type === 'ups') {
+        equipment.model = model || undefined;
+        equipment.power = power || undefined;
+        equipment.ipAddress = ipAddress || undefined;
+      } else if (type === 'accessory') {
         equipment.description = description || undefined;
       }
       
@@ -138,10 +158,15 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       
       const result = await addEquipment(rack.id, equipment);
       
-      console.log("Equipment added result:", JSON.stringify(result, null, 2));
-      console.log("VLANs in result:", result.vlans);
+      let successMessage = "Équipement ajouté avec succès";
+      switch (type) {
+        case 'switch': successMessage = "Switch ajouté avec succès"; break;
+        case 'server': successMessage = "Serveur ajouté avec succès"; break;
+        case 'accessory': successMessage = "Accessoire ajouté avec succès"; break;
+        case 'ups': successMessage = "Onduleur ajouté avec succès"; break;
+      }
       
-      toast.success(`${type === 'switch' ? 'Switch' : 'Serveur'} ajouté avec succès`);
+      toast.success(successMessage);
       onOpenChange(false);
       
       resetForm();
@@ -160,10 +185,13 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     setPosition('');
     setSize('1');
     setPortCount('');
+    setSfpPortCount('');
     setIpAddress('');
     setVlans('');
     setIdracIp('');
     setDescription('');
+    setModel('');
+    setPower('');
   };
 
   return (
@@ -182,14 +210,22 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             className="w-full"
             onValueChange={(value) => setEquipmentType(value as EquipmentType)}
           >
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="server" className="flex items-center gap-2">
-                <Server className="h-4 w-4" />
+            <TabsList className="grid w-full grid-cols-4 mb-4">
+              <TabsTrigger value="server" className="flex items-center gap-1">
+                <Server className="h-3 w-3" />
                 Serveur
               </TabsTrigger>
-              <TabsTrigger value="switch" className="flex items-center gap-2">
-                <Cpu className="h-4 w-4" />
+              <TabsTrigger value="switch" className="flex items-center gap-1">
+                <Cpu className="h-3 w-3" />
                 Switch
+              </TabsTrigger>
+              <TabsTrigger value="ups" className="flex items-center gap-1">
+                <Battery className="h-3 w-3" />
+                Onduleur
+              </TabsTrigger>
+              <TabsTrigger value="accessory" className="flex items-center gap-1">
+                <Package className="h-3 w-3" />
+                Divers
               </TabsTrigger>
             </TabsList>
             
@@ -231,15 +267,21 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="brand">Marque/Modèle</Label>
-                <Input
-                  id="brand"
-                  placeholder="ex. Dell PowerEdge R740"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                />
-              </div>
+              {equipmentType !== 'accessory' && (
+                <div className="space-y-2">
+                  <Label htmlFor="brand">Marque/Modèle</Label>
+                  <Input
+                    id="brand"
+                    placeholder={
+                      equipmentType === 'server' ? 'ex. Dell PowerEdge R740' : 
+                      equipmentType === 'switch' ? 'ex. Cisco Catalyst 3850' :
+                      'ex. APC Smart-UPS'
+                    }
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
             
             <TabsContent value="server" className="space-y-4">
@@ -265,20 +307,37 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             </TabsContent>
             
             <TabsContent value="switch" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="portCount">Nombre de Ports</Label>
-                <Select onValueChange={setPortCount}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner nombre de ports" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[8, 12, 16, 24, 48, 96].map((count) => (
-                      <SelectItem key={count} value={count.toString()}>
-                        {count} ports
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="portCount">Nombre de Ports RJ45</Label>
+                  <Select onValueChange={setPortCount}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nombre de ports" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[0, 8, 12, 16, 24, 48, 96].map((count) => (
+                        <SelectItem key={count} value={count.toString()}>
+                          {count} ports
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sfpPortCount">Nombre de Ports SFP</Label>
+                  <Select onValueChange={setSfpPortCount}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nombre de ports SFP" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[0, 2, 4, 8, 12, 16, 24, 48].map((count) => (
+                        <SelectItem key={count} value={count.toString()}>
+                          {count} ports SFP
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -298,6 +357,50 @@ const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
                   placeholder="ex. VLAN 10, VLAN 20"
                   value={vlans}
                   onChange={(e) => setVlans(e.target.value)}
+                />
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="accessory" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Input
+                  id="accessoryDescription"
+                  placeholder="Description de l'accessoire"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="ups" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="model">Modèle</Label>
+                <Input
+                  id="model"
+                  placeholder="ex. Smart-UPS RT 5000"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="power">Puissance</Label>
+                <Input
+                  id="power"
+                  placeholder="ex. 5000VA / 3500W"
+                  value={power}
+                  onChange={(e) => setPower(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="upsIpAddress">Adresse IP</Label>
+                <Input
+                  id="upsIpAddress"
+                  placeholder="ex. 192.168.1.10"
+                  value={ipAddress}
+                  onChange={(e) => setIpAddress(e.target.value)}
                 />
               </div>
             </TabsContent>

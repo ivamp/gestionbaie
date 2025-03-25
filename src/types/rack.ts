@@ -1,5 +1,5 @@
 
-export type EquipmentType = 'switch' | 'server';
+export type EquipmentType = 'switch' | 'server' | 'accessory' | 'ups';
 
 export interface VirtualMachine {
   id: string;
@@ -15,7 +15,8 @@ export interface SwitchPort {
   description: string;
   connected: boolean;
   taggedVlans: string[];
-  isFibre?: boolean; // Nouveau champ pour indiquer si le port est en fibre optique
+  isFibre?: boolean; // Indique si le port est en fibre optique
+  isSFP?: boolean;   // Indique si c'est un port SFP
 }
 
 export interface Equipment {
@@ -27,6 +28,7 @@ export interface Equipment {
   size: number; // number of Us
   // Switch-specific properties
   portCount?: number;
+  sfpPortCount?: number; // Nombre de ports SFP
   ipAddress?: string;
   vlans?: string[];
   ports?: SwitchPort[];
@@ -34,6 +36,9 @@ export interface Equipment {
   idracIp?: string;
   description?: string;
   virtualMachines?: VirtualMachine[];
+  // UPS-specific properties
+  model?: string;
+  power?: string;
 }
 
 export interface Rack {

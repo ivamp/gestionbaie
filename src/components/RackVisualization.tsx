@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Equipment, Rack } from '@/types/rack';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Server, Cpu, Edit } from 'lucide-react';
+import { Server, Cpu, Edit, Package, Battery } from 'lucide-react';
 import EquipmentDetailPanel from './EquipmentDetailPanel';
 import EditEquipmentDialog from './EditEquipmentDialog';
 import { toast } from 'sonner';
@@ -52,6 +52,17 @@ const RackVisualization: React.FC<RackVisualizationProps> = ({
     toast.success("Équipement supprimé avec succès");
   };
 
+  // Obtenir l'icône basée sur le type d'équipement
+  const getEquipmentIcon = (type: string) => {
+    switch (type) {
+      case 'server': return <Server className="h-4 w-4" />;
+      case 'switch': return <Cpu className="h-4 w-4" />;
+      case 'accessory': return <Package className="h-4 w-4" />;
+      case 'ups': return <Battery className="h-4 w-4" />;
+      default: return <Server className="h-4 w-4" />;
+    }
+  };
+
   // Rendu des unités de rack avec équipements
   const renderRackUnits = () => {
     // Créer un tableau pour représenter chaque unité dans le rack
@@ -81,12 +92,20 @@ const RackVisualization: React.FC<RackVisualizationProps> = ({
         // Si c'est la première unité de l'équipement, afficher l'équipement complet
         if (i === occupyingEquipment.position) {
           const equipmentHeight = occupyingEquipment.size * 48; // 48px par unité
-          const equipmentClass = occupyingEquipment.type === 'switch' ? 'switch-equipment' : 'server-equipment';
+          const getEquipmentClass = () => {
+            switch (occupyingEquipment.type) {
+              case 'switch': return 'switch-equipment bg-blue-50 dark:bg-blue-950';
+              case 'server': return 'server-equipment bg-green-50 dark:bg-green-950';
+              case 'accessory': return 'accessory-equipment bg-purple-50 dark:bg-purple-950';
+              case 'ups': return 'ups-equipment bg-amber-50 dark:bg-amber-950';
+              default: return '';
+            }
+          };
           
           unitContent = (
             <div 
               key={`equipment-${occupyingEquipment.id}-${i}`}
-              className={`rack-unit-occupied ${equipmentClass} border-b cursor-pointer ${
+              className={`rack-unit-occupied ${getEquipmentClass()} border-b cursor-pointer ${
                 selectedEquipment?.id === occupyingEquipment.id ? 'ring-2 ring-primary' : ''
               }`}
               style={{ height: `${equipmentHeight}px` }}
@@ -104,26 +123,32 @@ const RackVisualization: React.FC<RackVisualizationProps> = ({
               
               <div className="ml-10 p-3 h-full flex flex-col">
                 <div className="flex items-center gap-2">
-                  {occupyingEquipment.type === 'switch' ? (
-                    <Cpu className="h-4 w-4" />
-                  ) : (
-                    <Server className="h-4 w-4" />
-                  )}
+                  {getEquipmentIcon(occupyingEquipment.type)}
                   <span className="font-medium text-sm">{occupyingEquipment.name}</span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {occupyingEquipment.brand} - {getPositionString(occupyingEquipment)}
+                  {occupyingEquipment.type === 'accessory' 
+                    ? getPositionString(occupyingEquipment)
+                    : `${occupyingEquipment.brand} - ${getPositionString(occupyingEquipment)}`
+                  }
                 </div>
                 
                 {occupyingEquipment.type === 'switch' && (
                   <div className="text-xs mt-1">
-                    <span className="text-muted-foreground">Ports:</span> {occupyingEquipment.portCount}
+                    <span className="text-muted-foreground">Ports:</span> {occupyingEquipment.portCount || 0} RJ45
+                    {occupyingEquipment.sfpPortCount ? `, ${occupyingEquipment.sfpPortCount} SFP` : ''}
                   </div>
                 )}
                 
                 {occupyingEquipment.type === 'server' && occupyingEquipment.virtualMachines && (
                   <div className="text-xs mt-1">
                     <span className="text-muted-foreground">VMs:</span> {occupyingEquipment.virtualMachines.length}
+                  </div>
+                )}
+                
+                {occupyingEquipment.type === 'ups' && occupyingEquipment.power && (
+                  <div className="text-xs mt-1">
+                    <span className="text-muted-foreground">Puissance:</span> {occupyingEquipment.power}
                   </div>
                 )}
               </div>
