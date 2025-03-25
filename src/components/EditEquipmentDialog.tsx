@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { updateEquipment, removeEquipment, addVirtualMachine, updateVirtualMachine, removeVirtualMachine, updateSwitchPort } from '@/services/rackService';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 interface EditEquipmentDialogProps {
   open: boolean;
@@ -48,6 +49,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
   const [size, setSize] = useState(equipment.size.toString());
   
   const [portCount, setPortCount] = useState(equipment.portCount?.toString() || '');
+  const [sfpPortCount, setSfpPortCount] = useState(equipment.sfpPortCount?.toString() || '');
   const [ipAddress, setIpAddress] = useState(equipment.ipAddress || '');
   const [vlans, setVlans] = useState(equipment.vlans?.join(', ') || '');
   const [ports, setPorts] = useState<SwitchPort[]>(equipment.ports || []);
@@ -73,6 +75,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     setPosition(equipment.position.toString());
     setSize(equipment.size.toString());
     setPortCount(equipment.portCount?.toString() || '');
+    setSfpPortCount(equipment.sfpPortCount?.toString() || '');
     setIpAddress(equipment.ipAddress || '');
     setVlans(equipment.vlans?.join(', ') || '');
     setPorts(equipment.ports || []);
@@ -85,7 +88,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
   
   useEffect(() => {
     setIsDirty(true);
-  }, [name, brand, position, size, portCount, ipAddress, vlans, ports, idracIp, description]);
+  }, [name, brand, position, size, portCount, sfpPortCount, ipAddress, vlans, ports, idracIp, description]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,7 +249,7 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
   };
   
   const handleInitPorts = async () => {
-    if (!equipment.portCount && !portCount) {
+    if ((!equipment.portCount && !portCount) && (!equipment.sfpPortCount && !sfpPortCount)) {
       toast.error("Le nombre de ports n'est pas défini");
       return;
     }
@@ -254,8 +257,10 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
     setIsSubmitting(true);
     
     try {
-      const count = parseInt(portCount || '0') || equipment.portCount || 0;
-      if (!count) {
+      const standardCount = parseInt(portCount || '0') || equipment.portCount || 0;
+      const sfpCount = parseInt(sfpPortCount || '0') || equipment.sfpPortCount || 0;
+      
+      if (!standardCount && !sfpCount) {
         toast.error("Nombre de ports invalide");
         setIsSubmitting(false);
         return;
@@ -263,20 +268,39 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
       
       const processedVlans = parseVlans(vlans);
       
-      const initialPorts = Array.from({ length: count }, (_, i) => ({
-        id: `temp-port-${Date.now()}-${i}`,
-        equipment_id: equipment.id,
-        portNumber: i + 1,
-        description: '',
-        connected: false,
-        taggedVlans: [] as string[],
-        isFibre: false
-      }));
+      const initialPorts = [];
+      
+      for (let i = 0; i < standardCount; i++) {
+        initialPorts.push({
+          id: `temp-port-${Date.now()}-${i}`,
+          equipment_id: equipment.id,
+          portNumber: i + 1,
+          description: '',
+          connected: false,
+          taggedVlans: [] as string[],
+          isFibre: false,
+          isSFP: false
+        });
+      }
+      
+      for (let i = 0; i < sfpCount; i++) {
+        initialPorts.push({
+          id: `temp-port-${Date.now()}-sfp-${i}`,
+          equipment_id: equipment.id,
+          portNumber: standardCount + i + 1,
+          description: 'SFP+',
+          connected: false,
+          taggedVlans: [] as string[],
+          isFibre: true,
+          isSFP: true
+        });
+      }
       
       setPorts(initialPorts);
       
       const updatedEquipment = {
-        portCount: count,
+        portCount: standardCount,
+        sfpPortCount: sfpCount,
         vlans: processedVlans,
         ports: initialPorts
       };
@@ -465,20 +489,38 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                   
                   {equipment.type === 'switch' && (
                     <>
-                      <div className="space-y-2">
-                        <Label htmlFor="portCount">Nombre de Ports</Label>
-                        <Select value={portCount} onValueChange={setPortCount}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Nombre de ports" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[8, 12, 16, 24, 48, 96].map((count) => (
-                              <SelectItem key={count} value={count.toString()}>
-                                {count} ports
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="portCount">Nombre de Ports RJ45</Label>
+                          <Select value={portCount} onValueChange={setPortCount}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Nombre de ports RJ45" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[0, 8, 12, 16, 24, 48].map((count) => (
+                                <SelectItem key={count} value={count.toString()}>
+                                  {count} ports
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="sfpPortCount">Nombre de Ports SFP+</Label>
+                          <Select value={sfpPortCount} onValueChange={setSfpPortCount}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Nombre de ports SFP+" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[0, 2, 4, 8, 16, 24, 48].map((count) => (
+                                <SelectItem key={count} value={count.toString()}>
+                                  {count} ports
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       
                       <div className="space-y-2">
@@ -624,7 +666,12 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                         
                         {[...ports].sort((a, b) => a.portNumber - b.portNumber).map((port) => (
                           <div key={port.id} className="grid grid-cols-12 gap-2 items-center border rounded-lg p-3">
-                            <div className="col-span-1 font-medium">{port.portNumber}</div>
+                            <div className="col-span-1 font-medium">
+                              {port.portNumber}
+                              {port.isSFP && 
+                                <Badge variant="outline" className="ml-1 text-xs bg-blue-100">SFP</Badge>
+                              }
+                            </div>
                             <div className="col-span-3">
                               <Input
                                 value={port.description || ''}

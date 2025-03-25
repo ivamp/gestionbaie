@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Equipment, VirtualMachine, SwitchPort } from '@/types/rack';
 import { 
@@ -84,7 +83,12 @@ const SwitchPortsTable: React.FC<{ ports: SwitchPort[], vlans: string[] | undefi
                 key={port.id} 
                 className="px-4 py-2 text-sm border-t grid grid-cols-12 gap-2 items-center"
               >
-                <div className="col-span-1 font-medium">{port.portNumber}</div>
+                <div className="col-span-1 font-medium">
+                  {port.portNumber}
+                  {port.isSFP && 
+                    <Badge variant="outline" className="ml-1 text-xs bg-blue-100">SFP</Badge>
+                  }
+                </div>
                 <div className="col-span-4">{port.description || "-"}</div>
                 <div className="col-span-2 flex items-center">
                   {port.connected ? (
@@ -217,7 +221,7 @@ const EquipmentDetailPanel: React.FC<EquipmentDetailPanelProps> = ({ equipment }
                       <div className="text-xs text-muted-foreground">Nombre de Ports</div>
                       <div>{equipment.portCount || 0} ports RJ45</div>
                     </div>
-                    {equipment.sfpPortCount && (
+                    {equipment.sfpPortCount && equipment.sfpPortCount > 0 && (
                       <div>
                         <div className="text-xs text-muted-foreground">Ports SFP</div>
                         <div>{equipment.sfpPortCount} ports SFP</div>
