@@ -786,4 +786,3 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
 };
 
 export default EditEquipmentDialog;
-
