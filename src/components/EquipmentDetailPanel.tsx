@@ -46,11 +46,11 @@ const VirtualMachineCard: React.FC<{ vm: VirtualMachine }> = ({ vm }) => {
         <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
           <div className="flex flex-col">
             <span className="text-xs text-muted-foreground">Adresse IP</span>
-            <span className="font-mono text-base">{vm.ipAddress}</span>
+            <span className="font-mono text-sm">{vm.ipAddress}</span>
           </div>
           <div className="flex flex-col">
             <span className="text-xs text-muted-foreground">Code AnyDesk</span>
-            <span className="font-mono text-base">{vm.anydeskCode}</span>
+            <span className="font-mono text-sm">{vm.anydeskCode}</span>
           </div>
         </div>
       </CardContent>
