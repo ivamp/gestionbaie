@@ -619,11 +619,11 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
                             <div className="grid grid-cols-2 gap-2 mt-2">
                               <div>
                                 <span className="text-xs text-muted-foreground">IP:</span>{" "}
-                                <span className="font-mono">{vm.ipAddress}</span>
+                                <span className="font-mono text-base">{vm.ipAddress}</span>
                               </div>
                               <div>
                                 <span className="text-xs text-muted-foreground">Anydesk:</span>{" "}
-                                <span className="font-mono">{vm.anydeskCode}</span>
+                                <span className="font-mono text-base">{vm.anydeskCode}</span>
                               </div>
                             </div>
                           </div>
@@ -786,3 +786,4 @@ const EditEquipmentDialog: React.FC<EditEquipmentDialogProps> = ({
 };
 
 export default EditEquipmentDialog;
+

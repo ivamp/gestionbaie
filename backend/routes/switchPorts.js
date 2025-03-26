@@ -7,7 +7,7 @@ const db = require('../db');
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { description, connected, taggedVlans, isFibre } = req.body;
+    const { description, connected, taggedVlans, isFibre, isSFP } = req.body;
     
     console.log("Update switch port request:", JSON.stringify(req.body, null, 2));
     
@@ -22,12 +22,13 @@ router.put('/:id', async (req, res) => {
     
     // Mettre à jour le port
     await db.query(
-      'UPDATE switch_ports SET description = ?, connected = ?, taggedVlans = ?, isFibre = ? WHERE id = ?',
+      'UPDATE switch_ports SET description = ?, connected = ?, taggedVlans = ?, isFibre = ?, isSFP = ? WHERE id = ?',
       [
         description !== undefined ? description : port.description,
         connected !== undefined ? (connected === true || connected === 1 ? 1 : 0) : port.connected,
         taggedVlansJson,
         isFibre !== undefined ? (isFibre === true || isFibre === 1 ? 1 : 0) : port.isFibre,
+        isSFP !== undefined ? (isSFP === true || isSFP === 1 ? 1 : 0) : port.isSFP,
         id
       ]
     );
